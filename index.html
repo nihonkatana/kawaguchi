@@ -334,13 +334,13 @@
         <div class="sep"></div>
 
         <div class="grid2">
-          <button class="btn primary block" onclick="app.startNavRecommended()">推奨ナビ開始（未訪問）</button>
+          <button class="btn primary block" onclick="app.startNavRecommended()">次の1地点ナビ（未の先頭）</button>
           <button class="btn block" onclick="app.pickNextPoint()">次点を選ぶ</button>
         </div>
 
         <div class="muted" style="margin-top:10px">
-          ルール：未訪問(todo)のみ・設置番号順。最大8地点をナビに渡します。<br>
-          ※iPhoneでGoogleマップがログイン要求される場合は、端末設定やアプリ状況に依存します（地図で確認→単点ナビ運用も可能）。
+          ルール：未訪問(todo)のみ・設置番号順。<br>
+          iPhoneでGoogleマップがログイン要求される場合があるため、本画面では「単点ナビ」を基本にしています（地図で選びやすい運用）。
         </div>
 
         <div class="sep"></div>
@@ -445,7 +445,10 @@
 <script>
 /** =========================
  *  CONFIG
- * ========================= */
+ * =========================
+ *  ★最重要：ここが違うとログインできません
+ *  前回動いていたURLに戻しています（index_20260104-1.htmlの値）
+ */
 const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxC3grMv-FZvGvOB2XR4CpUKmTotB5bsE-HontXPzl4zM6JSEzW2v-sY_k4r2ncSvESMw/exec";
 
 /** =========================
@@ -455,7 +458,7 @@ const store = {
   user_id: localStorage.getItem("user_id") || "",
   display_name: localStorage.getItem("display_name") || "",
   role: localStorage.getItem("role") || "",
-  travel_mode: localStorage.getItem("travel_mode") || "driving", // default: driving
+  travel_mode: localStorage.getItem("travel_mode") || "driving", // default: driving|walking
   assigned_areas: [],
   points: [],
   state: {}, // point_id -> {status,memo}
@@ -470,12 +473,14 @@ const store = {
   // map
   map: null,
   mapMarkers: [],
-  mapReadyArea: "",
 };
 
 /** =========================
  *  UI HELPERS
  * ========================= */
+function isIOS(){
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
 const ui = {
   toast: (msg) => {
     const t = document.getElementById("toast");
@@ -496,33 +501,37 @@ const ui = {
  *  HTTP
  * ========================= */
 async function postAction(payload) {
-  if (!GAS_WEBAPP_URL || GAS_WEBAPP_URL.includes("PASTE_YOUR")) {
-    ui.toast("GAS_WEBAPP_URL を設定してください");
-    throw new Error("Missing GAS_WEBAPP_URL");
-  }
   const res = await fetch(GAS_WEBAPP_URL, {
     method: "POST",
-    headers: { "Content-Type":"text/plain;charset=utf-8" }, // GASのCORS/プリフライト回避
+    // GASでCORS/プリフライト回避
+    headers: { "Content-Type":"text/plain;charset=utf-8" },
     body: JSON.stringify(payload),
   });
   const text = await res.text();
   let data;
   try { data = JSON.parse(text); }
-  catch { throw new Error("Bad JSON response: " + text.slice(0,200)); }
+  catch {
+    // ここで "OK" が返る場合、URL違い or デプロイ違いが濃厚
+    throw new Error("Bad JSON response: " + text.slice(0,200));
+  }
   return data;
 }
 
 /** =========================
- *  MAPS URL
+ *  MAPS URL (single)
  * ========================= */
 function encodeLoc(lat,lng){
   return `${Number(lat).toFixed(7)},${Number(lng).toFixed(7)}`;
 }
-function buildDirUrl(pointsLatLng, travelMode){
-  // /dir/Current+Location/lat,lng/... ?travelmode=driving|walking
-  const base = "https://www.google.com/maps/dir/";
-  const parts = ["Current+Location", ...pointsLatLng];
-  return base + parts.join("/") + `?travelmode=${encodeURIComponent(travelMode||"driving")}`;
+function buildAppleSingleUrl(lat, lng, travelMode){
+  const dirflg = (travelMode === "walking") ? "w" : "d";
+  const daddr = encodeURIComponent(`${Number(lat).toFixed(7)},${Number(lng).toFixed(7)}`);
+  return `https://maps.apple.com/?daddr=${daddr}&dirflg=${dirflg}`;
+}
+function buildGoogleSingleUrl(lat, lng, travelMode){
+  const mode = (travelMode === "walking") ? "walking" : "driving";
+  const dest = encodeURIComponent(`${Number(lat).toFixed(7)},${Number(lng).toFixed(7)}`);
+  return `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=${encodeURIComponent(mode)}`;
 }
 function statusBadge(status){
   if (status === "done") return `<span class="badge bDone">済</span>`;
@@ -552,16 +561,11 @@ const app = {
   /* ========= Settings ========= */
   openSettings(){
     const box = document.getElementById("currentUserBox");
-    if (store.user_id) {
-      box.textContent = `ログイン中：${store.display_name || ""}（${store.role || ""}）`;
-    } else {
-      box.textContent = "未ログイン";
-    }
+    if (store.user_id) box.textContent = `ログイン中：${store.display_name || ""}（${store.role || ""}）`;
+    else box.textContent = "未ログイン";
     document.getElementById("settingsModal").style.display = "block";
   },
-  closeSettings(){
-    document.getElementById("settingsModal").style.display = "none";
-  },
+  closeSettings(){ document.getElementById("settingsModal").style.display = "none"; },
 
   showAuth(){
     document.getElementById("authView").style.display = "block";
@@ -576,9 +580,16 @@ const app = {
     if (!nickname || !id_name) { ui.toast("必須項目を入力してください"); return; }
 
     ui.toast("ログイン中…");
-    const data = await postAction({ action:"register", nickname, id_name });
+    let data;
+    try {
+      data = await postAction({ action:"register", nickname, id_name });
+    } catch (e) {
+      ui.toast("通信エラー：" + e.message);
+      return;
+    }
+
     if (!data.ok) {
-      if (data.error === "NOT_ALLOWED") ui.toast("ログインできません（ホワイトリスト未登録）");
+      if (data.error === "NOT_ALLOWED") ui.toast("ログインできません（ホワイトリスト未登録/無効）");
       else ui.toast("ログイン失敗：" + (data.error || "不明"));
       return;
     }
@@ -598,7 +609,14 @@ const app = {
 
   async bootstrap(){
     ui.toast("読み込み中…");
-    const data = await postAction({ action:"bootstrap", user_id: store.user_id });
+    let data;
+    try {
+      data = await postAction({ action:"bootstrap", user_id: store.user_id });
+    } catch (e) {
+      ui.toast("通信エラー：" + e.message);
+      return;
+    }
+
     if (!data.ok) {
       ui.toast("認証エラー。ログアウトします");
       app.logout();
@@ -618,7 +636,6 @@ const app = {
 
     const tabs = document.getElementById("tabs");
     tabs.style.display = "flex";
-
     const canAlloc = (store.role === "allocator" || store.role === "planner");
     document.getElementById("tabAlloc").style.display = canAlloc ? "block" : "none";
 
@@ -640,7 +657,6 @@ const app = {
     localStorage.removeItem("user_id");
     localStorage.removeItem("display_name");
     localStorage.removeItem("role");
-    // travel_mode stays
     store.user_id = "";
     store.display_name = "";
     store.role = "";
@@ -672,8 +688,7 @@ const app = {
   },
 
   openTravelModePicker(){
-    const current = store.travel_mode;
-    const currentShort = (current === "walking") ? "W" : "D";
+    const currentShort = (store.travel_mode === "walking") ? "W" : "D";
     const chosen = prompt("移動手段（D=車 / W=徒歩）", currentShort);
     if (!chosen) return;
 
@@ -731,15 +746,8 @@ const app = {
         </div>
       `;
 
-      // ボタンでもカードでも開ける
-      item.onclick = (ev) => {
-        // ボタン押下も同じ挙動（誤爆防止のため止めない）
-        app.openPrecinct(area);
-      };
-      item.querySelector("button").onclick = (ev) => {
-        ev.stopPropagation();
-        app.openPrecinct(area);
-      };
+      item.onclick = () => app.openPrecinct(area);
+      item.querySelector("button").onclick = (ev) => { ev.stopPropagation(); app.openPrecinct(area); };
 
       el.appendChild(item);
     }
@@ -747,8 +755,7 @@ const app = {
 
   openPrecinct(area){
     store.current_area = area;
-    const detail = document.getElementById("precinctDetail");
-    detail.style.display = "block";
+    document.getElementById("precinctDetail").style.display = "block";
 
     const pts = store.points
       .filter(p => p.area_id === area)
@@ -824,31 +831,16 @@ const app = {
       .filter(p => p.area_id === area)
       .slice()
       .sort((a,b)=>a.order_reco-b.order_reco || a.point_id.localeCompare(b.point_id));
-
     return pts.filter(p => (store.state[p.point_id]?.status || "todo") === "todo");
   },
 
   async startNavRecommended(){
+    // 複数経由地ナビはやめて「次の1地点」に寄せる（iPhone Googleログイン要求回避 & 運用に合う）
     const area = store.current_area;
     if (!area) { ui.toast("投票区を開いてください"); return; }
-
     const todoPts = app.getTodoPointsInArea(area);
     if (todoPts.length === 0) { ui.toast("未訪問がありません"); return; }
-
-    const take = todoPts.slice(0, 8);
-    const latlngs = take.map(p => encodeLoc(p.lat, p.lng));
-    const url = buildDirUrl(latlngs, store.travel_mode);
-
-    await postAction({
-      action:"nav_start",
-      actor_user_id: store.user_id,
-      area_id: area,
-      included_point_ids: take.map(p=>p.point_id),
-      maps_url: url,
-      client_time: new Date().toISOString()
-    });
-
-    window.location.href = url;
+    await app.startSingleNav(todoPts[0].point_id);
   },
 
   async pickNextPoint(){
@@ -860,32 +852,22 @@ const app = {
     const options = todoPts.slice(0, 25).map(p=>`#${p.order_reco} ${p.point_id} ${(p.name||"").slice(0,24)}`).join("\n");
     const input = prompt("次に行く地点の point_id を入力してください（未訪問から）\n\n候補（先頭25）:\n" + options, todoPts[0].point_id);
     if (!input) return;
+
     const pid = input.trim();
-    const idx = todoPts.findIndex(p=>p.point_id===pid);
-    if (idx < 0) { ui.toast("未訪問の point_id を入力してください"); return; }
-
-    const ordered = [todoPts[idx], ...todoPts.filter((_,i)=>i!==idx)].slice(0,8);
-    const latlngs = ordered.map(p => encodeLoc(p.lat, p.lng));
-    const url = buildDirUrl(latlngs, store.travel_mode);
-
-    await postAction({
-      action:"nav_start",
-      actor_user_id: store.user_id,
-      area_id: area,
-      included_point_ids: ordered.map(p=>p.point_id),
-      maps_url: url,
-      client_time: new Date().toISOString()
-    });
-
-    window.location.href = url;
+    const p = todoPts.find(x=>x.point_id===pid);
+    if (!p) { ui.toast("未訪問の point_id を入力してください"); return; }
+    await app.startSingleNav(p.point_id);
   },
 
   async startSingleNav(point_id){
     const p = store.points.find(x=>x.point_id===point_id);
     if (!p) { ui.toast("地点が見つかりません"); return; }
-    const url = buildDirUrl([encodeLoc(p.lat,p.lng)], store.travel_mode);
 
-    await postAction({
+    const url = isIOS()
+      ? buildAppleSingleUrl(p.lat, p.lng, store.travel_mode)
+      : buildGoogleSingleUrl(p.lat, p.lng, store.travel_mode);
+
+    const resp = await postAction({
       action:"nav_start",
       actor_user_id: store.user_id,
       area_id: p.area_id,
@@ -893,7 +875,9 @@ const app = {
       maps_url: url,
       client_time: new Date().toISOString()
     });
+    if (!resp.ok) { ui.toast("履歴記録に失敗：" + (resp.error||"")); return; }
 
+    // iOSは window.location の方がブロックされにくい
     window.location.href = url;
   },
 
@@ -901,12 +885,9 @@ const app = {
     const p = store.points.find(x=>x.point_id===point_id);
     if (!p) { ui.toast("地点が見つかりません"); return; }
 
-    if (action === "single") {
-      await app.startSingleNav(point_id);
-      return;
-    }
+    if (action === "single") { await app.startSingleNav(point_id); return; }
 
-    let status = action; // "done" or "todo" or "memo"
+    let status = action; // done|todo|memo
     let memo = store.state[point_id]?.memo || "";
 
     if (action === "memo") {
@@ -933,7 +914,7 @@ const app = {
 
     store.state[point_id] = { status, memo };
     ui.toast("更新しました");
-    app.openPrecinct(p.area_id); // rerender + map refresh
+    app.openPrecinct(p.area_id);
   },
 
   /** -------- Leaflet map (only in precinct) -------- */
@@ -946,12 +927,8 @@ const app = {
       .slice()
       .sort((a,b)=>a.order_reco-b.order_reco || a.point_id.localeCompare(b.point_id));
 
-    if (pts.length === 0) {
-      wrap.style.display = "none";
-      return;
-    }
+    if (pts.length === 0) { wrap.style.display = "none"; return; }
 
-    // init map once
     if (!store.map) {
       store.map = L.map('map', { zoomControl:true });
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -960,15 +937,12 @@ const app = {
       }).addTo(store.map);
     }
 
-    // clear old markers
     for (const mk of store.mapMarkers) mk.remove();
     store.mapMarkers = [];
 
-    // bounds
     const latlngs = pts.map(p => [Number(p.lat), Number(p.lng)]).filter(x=>isFinite(x[0]) && isFinite(x[1]));
     const bounds = L.latLngBounds(latlngs);
 
-    // markers
     for (const p of pts) {
       const st = store.state[p.point_id]?.status || "todo";
       const isDone = (st === "done");
@@ -976,7 +950,6 @@ const app = {
 
       const mk = L.marker([Number(p.lat), Number(p.lng)], { title: label });
 
-      // popup with actions
       const btnSingle = `<button style="padding:10px 12px; font-weight:900; border-radius:10px; border:0; cursor:pointer;">単点ナビ</button>`;
       const btnDone   = `<button style="padding:10px 12px; font-weight:900; border-radius:10px; border:0; cursor:pointer; background:${isDone?"#2a2f3f":"#1fb56a"}; color:${isDone?"#eef2ff":"#071a10"};">${isDone ? "済（現在）" : "済にする"}</button>`;
       const btnTodo   = `<button style="padding:10px 12px; font-weight:900; border-radius:10px; border:0; cursor:pointer; background:#2a2f3f; color:#eef2ff;">未に戻す</button>`;
@@ -1020,14 +993,9 @@ const app = {
       store.mapMarkers.push(mk);
     }
 
-    // fit bounds
-    try {
-      store.map.fitBounds(bounds.pad(0.18));
-    } catch {
-      store.map.setView([Number(pts[0].lat), Number(pts[0].lng)], 16);
-    }
+    try { store.map.fitBounds(bounds.pad(0.18)); }
+    catch { store.map.setView([Number(pts[0].lat), Number(pts[0].lng)], 16); }
 
-    // iOS Safari: mapサイズが崩れることがあるので再計算
     setTimeout(()=>{ try { store.map.invalidateSize(); } catch {} }, 250);
   },
 
@@ -1037,7 +1005,7 @@ const app = {
     const assnResp  = await postAction({ action:"alloc_list_assignments", actor_user_id: store.user_id });
 
     if (!usersResp.ok || !assnResp.ok) {
-      ui.toast("※GASに alloc_list_users / alloc_list_assignments を追加してください");
+      ui.toast("割当データ取得に失敗（権限/設定を確認）");
       store.allUsers = [];
       store.assignments = [];
       app.renderUserCandidates();
@@ -1065,7 +1033,7 @@ const app = {
       .slice(0, 10);
 
     if (list.length === 0) {
-      el.innerHTML = `<div class="item"><div class="itemTitle">候補なし</div><div class="itemSub muted">users を取得できていない場合はGAS側の action を確認してください。</div></div>`;
+      el.innerHTML = `<div class="item"><div class="itemTitle">候補なし</div></div>`;
       return;
     }
 
@@ -1143,32 +1111,15 @@ const app = {
       });
     }
 
-    const resp = await postAction({
-      action:"alloc_update",
-      actor_user_id: store.user_id,
-      ops
-    });
-
+    const resp = await postAction({ action:"alloc_update", actor_user_id: store.user_id, ops });
     if (!resp.ok) { ui.toast("割当失敗：" + (resp.error||"")); return; }
 
     let conflict = 0, ok = 0;
     for (const r of (resp.results||[])) {
-      if (r.ok) {
-        ok++;
-        const a = store.assignments.find(x=>x.area_id===r.area_id);
-        if (a) {
-          a.version = r.new_version;
-          a.status = "assigned";
-          a.assignee_user_id = store.selectedAssignee.user_id;
-          a.assignee_display_name = store.selectedAssignee.display_name;
-          a.updated_at = new Date().toISOString();
-          a.updated_by_name = store.display_name;
-        }
-      } else if (r.error === "CONFLICT") conflict++;
+      if (r.ok) ok++; else if (r.error === "CONFLICT") conflict++;
     }
-
     ui.toast(`割当：成功${ok} / 競合${conflict}`);
-    app.renderAssignments();
+    await app.loadAllocatorData();
   },
 
   async bulkUnassign(){
@@ -1179,40 +1130,18 @@ const app = {
     for (const area of store.selectedAreas) {
       const a = store.assignments.find(x=>x.area_id===area);
       if (!a) continue;
-      ops.push({
-        area_id: area,
-        action: "unassign",
-        expected_version: Number(a.version),
-        note
-      });
+      ops.push({ area_id: area, action: "unassign", expected_version: Number(a.version), note });
     }
 
-    const resp = await postAction({
-      action:"alloc_update",
-      actor_user_id: store.user_id,
-      ops
-    });
-
+    const resp = await postAction({ action:"alloc_update", actor_user_id: store.user_id, ops });
     if (!resp.ok) { ui.toast("解除失敗：" + (resp.error||"")); return; }
 
     let conflict = 0, ok = 0;
     for (const r of (resp.results||[])) {
-      if (r.ok) {
-        ok++;
-        const a = store.assignments.find(x=>x.area_id===r.area_id);
-        if (a) {
-          a.version = r.new_version;
-          a.status = "unassigned";
-          a.assignee_user_id = "";
-          a.assignee_display_name = "";
-          a.updated_at = new Date().toISOString();
-          a.updated_by_name = store.display_name;
-        }
-      } else if (r.error === "CONFLICT") conflict++;
+      if (r.ok) ok++; else if (r.error === "CONFLICT") conflict++;
     }
-
     ui.toast(`解除：成功${ok} / 競合${conflict}`);
-    app.renderAssignments();
+    await app.loadAllocatorData();
   },
 
   async allowlistAdd(){
@@ -1221,13 +1150,7 @@ const app = {
     const note     = (document.getElementById("alNote").value || "").trim();
     if (!nickname || !id_name) { ui.toast("必須項目を入力してください"); return; }
 
-    const resp = await postAction({
-      action:"allowlist_add",
-      actor_user_id: store.user_id,
-      nickname,
-      id_name,
-      note
-    });
+    const resp = await postAction({ action:"allowlist_add", actor_user_id: store.user_id, nickname, id_name, note });
     if (!resp.ok) { ui.toast("追加失敗：" + (resp.error||"")); return; }
     ui.toast("追加しました： " + resp.allow_id);
     document.getElementById("alNick").value = "";
@@ -1238,11 +1161,7 @@ const app = {
   async allowlistDisable(){
     const allow_id = (document.getElementById("alDisableId").value || "").trim();
     if (!allow_id) { ui.toast("allow_id を入力してください"); return; }
-    const resp = await postAction({
-      action:"allowlist_disable",
-      actor_user_id: store.user_id,
-      allow_id
-    });
+    const resp = await postAction({ action:"allowlist_disable", actor_user_id: store.user_id, allow_id });
     if (!resp.ok) { ui.toast("無効化失敗：" + (resp.error||"")); return; }
     ui.toast("無効化しました");
     document.getElementById("alDisableId").value = "";
@@ -1250,12 +1169,9 @@ const app = {
 };
 
 window.app = app;
-
-// Close settings when tapping outside modal content
 document.getElementById("settingsModal").addEventListener("click", (e)=>{
   if (e.target.id === "settingsModal") app.closeSettings();
 });
-
 app.init();
 </script>
 </body>
