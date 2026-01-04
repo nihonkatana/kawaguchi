@@ -328,7 +328,7 @@ const ui = {
  *  HTTP
  * ========================= */
 async function postAction(payload) {
-  if (!GAS_WEBAPP_URL || GAS_WEBAPP_URL.includes("https://script.google.com/macros/s/AKfycbxBqhcsi5xm_Fm9lcMdrNhF67U7FmE9whnizco2pPDN3T4l22pE697Hl-n4OX2Zwv-G7g/exec")) {
+  if (!GAS_WEBAPP_URL || GAS_WEBAPP_URL.includes("YOUR_GAS_WEBAPP_URL_HERE")) {
     ui.toast("GAS_WEBAPP_URL を設定してください");
     throw new Error("Missing GAS_WEBAPP_URL");
   }
