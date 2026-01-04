@@ -1,0 +1,1191 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta name="robots" content="noindex, nofollow">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>選挙掲示板ナビルート</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <!-- MarkerCluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+
+  <style>
+    :root { --bg:#0b0f1a; --card:#121a2b; --muted:#a7b0c0; --text:#eef2ff; --accent:#4f8cff; --danger:#ff5c5c; --ok:#2fe27d; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Noto Sans JP","Hiragino Kaku Gothic ProN","Meiryo",sans-serif;background:var(--bg);color:var(--text)}
+    a{color:inherit}
+    .wrap{max-width:720px;margin:0 auto;padding:16px 14px 90px}
+    .topbar{position:sticky;top:0;z-index:50;background:linear-gradient(to bottom, rgba(11,15,26,.98), rgba(11,15,26,.80));backdrop-filter: blur(10px);padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08)}
+    .row{display:flex;gap:10px;align-items:center}
+    .space{justify-content:space-between}
+    .title{font-size:16px;font-weight:700}
+    .pill{font-size:12px;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.08);color:var(--muted)}
+    .btn{border:none;border-radius:12px;padding:12px 14px;font-weight:700;font-size:14px;background:rgba(255,255,255,.10);color:var(--text);cursor:pointer}
+    .btn:active{transform:translateY(1px)}
+    .btn.primary{background:var(--accent)}
+    .btn.ok{background:var(--ok); color:#052012}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.14)}
+    .btn.small{padding:9px 10px;font-size:13px;border-radius:10px}
+    .btn.block{width:100%}
+    .card{background:var(--card);border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:14px;margin:12px 0;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .muted{color:var(--muted)}
+    .h2{font-size:15px;font-weight:800;margin:0 0 8px}
+    .h3{font-size:13px;font-weight:800;margin:0 0 6px}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+    .field{width:100%;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:var(--text);outline:none}
+    .field::placeholder{color:rgba(167,176,192,.7)}
+    .tabs{position:fixed;left:0;right:0;bottom:0;background:rgba(18,26,43,.96);backdrop-filter: blur(10px);border-top:1px solid rgba(255,255,255,.12);padding:10px 12px;display:flex;gap:10px;z-index:60}
+    .tab{flex:1;text-align:center;padding:10px;border-radius:12px;font-weight:800;font-size:13px;color:var(--muted);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.10);cursor:pointer}
+    .tab.active{color:var(--text);background:rgba(79,140,255,.20);border-color:rgba(79,140,255,.50)}
+    .badge{font-size:11px;padding:4px 8px;border-radius:999px;background:rgba(255,255,255,.08);color:var(--muted)}
+    .bTodo{background:rgba(79,140,255,.18);color:#b8d4ff}
+    .bDone{background:rgba(47,226,125,.18);color:#a9ffd0}
+    .sep{height:1px;background:rgba(255,255,255,.10);margin:12px 0}
+    .list{display:flex;flex-direction:column;gap:10px}
+    .item{padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.05)}
+    .itemTop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+    .itemTitle{font-weight:900;font-size:14px;line-height:1.25}
+    .itemSub{font-size:12px;color:var(--muted);margin-top:4px;white-space:pre-wrap}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .right{display:flex;gap:8px;align-items:center}
+    .kpi{display:flex;gap:8px;flex-wrap:wrap}
+    .kpi .pill{background:rgba(255,255,255,.06)}
+    .toast{position:fixed;left:14px;right:14px;top:14px;z-index:100;display:none}
+    .toast.show{display:block}
+    .toast .card{margin:0}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px}
+    .checkbox{transform:scale(1.15)}
+    .tiny{font-size:11px;color:rgba(167,176,192,.85)}
+
+    /* settings button */
+    #btnSettings{
+      position:fixed; right:12px; top:12px; z-index:1000;
+      padding:10px 12px; border-radius:999px;
+      background:rgba(255,255,255,.10); color:var(--text);
+      border:1px solid rgba(255,255,255,.14);
+      cursor:pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="row space">
+      <div class="title">選挙掲示板ナビルート</div>
+      <div class="right">
+        <span id="rolePill" class="pill">未ログイン</span>
+      </div>
+    </div>
+    <div class="row space" style="margin-top:10px">
+      <div class="kpi">
+        <span class="pill" id="userPill">ユーザー：-</span>
+        <span class="pill" id="modePill">移動：車</span>
+      </div>
+      <button class="btn small" onclick="app.reload()">更新</button>
+    </div>
+  </div>
+
+  <button id="btnSettings" aria-label="設定">⚙️</button>
+
+  <div class="toast" id="toast"><div class="card"><div id="toastText"></div></div></div>
+
+  <div class="wrap">
+    <!-- AUTH / REGISTER -->
+    <div id="authView" class="card" style="display:none">
+      <div class="h2">ログイン（初回登録）</div>
+      <div class="muted" style="font-size:12px;line-height:1.55">
+        ニックネームと識別名を入力してください。<br>
+        識別名は、LINE表示名がある方はその表示名。LINEがない方は周囲が識別できる名前（班名＋氏名など）を入力してください。
+      </div>
+      <div style="margin-top:12px">
+        <div class="h3">ニックネーム（必須）</div>
+        <input id="inNick" class="field" placeholder="例：ごまちゃん / A班田中" />
+      </div>
+      <div style="margin-top:10px">
+        <div class="h3">識別名（必須）</div>
+        <input id="inIdName" class="field" placeholder="例：明石家 ゴマ / A班 田中" />
+      </div>
+      <div class="sep"></div>
+      <button class="btn primary block" onclick="app.register()">ログイン</button>
+      <div class="tiny" style="margin-top:10px">
+        ログインできない場合：責任者に「ニックネーム」と「識別名」を伝えてホワイトリスト登録を依頼してください。<br>
+        ホワイトリストの「ニックネーム」「識別名」に完全一致（空白ゆれは吸収）でログインできます。
+      </div>
+    </div>
+
+    <!-- FIELD -->
+    <div id="fieldView" style="display:none">
+      <div class="card">
+        <div class="row space">
+          <div>
+            <div class="h2">担当投票区</div>
+            <div class="muted" style="font-size:12px">割当された投票区（P###）のみ表示されます。</div>
+          </div>
+          <button class="btn small" onclick="app.openTravelModePicker()">移動手段</button>
+        </div>
+        <div class="sep"></div>
+        <div id="precinctList" class="list"></div>
+      </div>
+
+      <div id="precinctDetail" class="card" style="display:none">
+        <div class="row space">
+          <div>
+            <div class="h2" id="precTitle">投票区</div>
+            <div class="muted" id="precSub" style="font-size:12px"></div>
+          </div>
+          <button class="btn small ghost" onclick="app.closePrecinct()">戻る</button>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="grid2">
+          <button class="btn primary block" onclick="app.startNavRecommended()">次の1地点ナビ（未訪問先頭）</button>
+          <button class="btn block" onclick="app.pickNextPoint()">次点を選ぶ</button>
+        </div>
+
+        <div class="muted" style="font-size:12px;margin-top:8px;line-height:1.5">
+          ルール：未訪問(todo)のみ・設置番号順。<br>
+          地図のピンをタップして、ナビ / 済 / 未に戻す / メモ ができます。<br>
+          ※ナビは新しいタブで開きます（戻りやすくするため）。
+        </div>
+
+        <div class="sep"></div>
+
+        <!-- Leaflet map -->
+        <div id="mapWrap" class="card" style="display:none; margin:0 0 12px 0">
+          <div class="row space">
+            <div>
+              <div class="h2">地図（投票区内）</div>
+              <div class="muted" style="font-size:12px;margin-top:4px">
+                ピンが多い投票区は自動でまとめ表示（クラスタ）されます。
+              </div>
+            </div>
+            <button class="btn small" onclick="app.recenterToMyLocation()">現在地へ</button>
+          </div>
+
+          <div class="sep"></div>
+
+          <!-- filters -->
+          <div class="grid3" style="margin-bottom:10px">
+            <button class="btn small" id="btnFilterAll" onclick="app.setMapFilter('all')">全て</button>
+            <button class="btn small" id="btnFilterTodo" onclick="app.setMapFilter('todo')">未のみ</button>
+            <button class="btn small" id="btnFilterDone" onclick="app.setMapFilter('done')">済のみ</button>
+          </div>
+
+          <div id="map" style="height: 380px; border-radius:14px; overflow:hidden;"></div>
+
+          <div class="tiny" id="gpsHint" style="margin-top:10px; line-height:1.35">
+            ※現在地を表示するには、ブラウザの位置情報を「許可」にしてください。
+          </div>
+        </div>
+
+        <div id="pointList" class="list"></div>
+      </div>
+    </div>
+
+    <!-- ALLOCATOR -->
+    <div id="allocView" style="display:none">
+      <div class="card">
+        <div class="h2">割当（責任者）</div>
+        <div class="muted" style="font-size:12px;line-height:1.5">
+          複数人同時操作を想定し、投票区ごとに version を持っています。競合した場合は「競合」と表示されます（更新してやり直し）。
+        </div>
+        <div class="sep"></div>
+
+        <div class="h3">担当者検索（users）</div>
+        <input id="inUserSearch" class="field" placeholder="表示名で検索（例：たなか）" oninput="app.renderUserCandidates()" />
+        <div id="userCandidates" class="list" style="margin-top:10px"></div>
+
+        <div class="sep"></div>
+
+        <div class="h3">投票区一覧</div>
+        <div class="muted" style="font-size:12px;margin-bottom:8px">複数選択して一括割当できます。</div>
+
+        <div class="grid2">
+          <button class="btn ok block" onclick="app.bulkAssign()">選択を割当</button>
+          <button class="btn ghost block" onclick="app.bulkUnassign()">選択を解除</button>
+        </div>
+
+        <div style="margin-top:10px">
+          <input id="inAssignNote" class="field" placeholder="メモ（任意：午前担当/引き継ぎ等）" />
+        </div>
+
+        <div class="sep"></div>
+        <div id="assignList" class="list"></div>
+      </div>
+
+      <div class="card">
+        <div class="h2">ホワイトリスト（allowlist）</div>
+        <div class="muted" style="font-size:12px">現場から連絡が来たら、その場で登録できます。</div>
+        <div class="sep"></div>
+
+        <div class="h3">追加</div>
+        <div class="grid2">
+          <input id="alNick" class="field" placeholder="ニックネーム（必須）" />
+          <input id="alIdName" class="field" placeholder="識別名（必須）" />
+        </div>
+        <div style="margin-top:10px">
+          <input id="alNote" class="field" placeholder="メモ（任意：班/特徴/電話末尾等）" />
+        </div>
+        <div style="margin-top:10px">
+          <button class="btn primary block" onclick="app.allowlistAdd()">ホワイトリストに追加</button>
+        </div>
+
+        <div class="sep"></div>
+        <div class="h3">無効化</div>
+        <input id="alDisableId" class="field" placeholder="allow_id（例：al_000123）" />
+        <div style="margin-top:10px">
+          <button class="btn ghost block" onclick="app.allowlistDisable()">この allow_id を無効化</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs" style="display:none">
+    <div class="tab active" id="tabField" onclick="app.switchTab('field')">現場</div>
+    <div class="tab" id="tabAlloc" onclick="app.switchTab('alloc')">責任者</div>
+  </div>
+
+  <!-- Settings modal -->
+  <div id="settingsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:1001;">
+    <div style="background:#fff; margin:12vh auto; padding:16px; width:min(92vw,420px); border-radius:12px; color:#111;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h2 style="margin:0; font-size:16px;">設定</h2>
+        <button id="btnCloseSettings" style="padding:6px 10px;">✕</button>
+      </div>
+
+      <div id="currentUserBox" style="margin-top:12px; font-size:14px; opacity:.85;"></div>
+
+      <hr style="margin:12px 0;">
+
+      <button id="btnLogoutInSettings" style="width:100%; padding:10px;">
+        この端末からログアウト
+      </button>
+
+      <p style="font-size:12px; opacity:.7; margin-top:10px;">
+        ※端末を他の人と共用する場合のみログアウトしてください。通常は不要です。
+      </p>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- MarkerCluster JS -->
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+<script>
+/** =========================
+ *  CONFIG
+ * ========================= */
+// ★ここをあなたのGAS WebアプリURLに置換してください
+const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxC3grMv-FZvGvOB2XR4CpUKmTotB5bsE-HontXPzl4zM6JSEzW2v-sY_k4r2ncSvESMw/exec";
+
+/** =========================
+ *  STATE
+ * ========================= */
+const store = {
+  user_id: localStorage.getItem("user_id") || "",
+  display_name: localStorage.getItem("display_name") || "",
+  role: localStorage.getItem("role") || "",
+  travel_mode: localStorage.getItem("travel_mode") || "driving", // driving|walking
+  assigned_areas: [],
+  points: [],
+  state: {},         // point_id -> {status,memo}
+  current_area: "",
+
+  // map filter
+  map_filter: "all", // all|todo|done
+
+  // gps
+  my_latlng: null,
+  gps_watch_id: null,
+
+  // allocator caches
+  allUsers: [],
+  assignments: [],
+  selectedAssignee: null,
+  selectedAreas: new Set(),
+};
+
+const ui = {
+  toast: (msg) => {
+    const t = document.getElementById("toast");
+    const tx = document.getElementById("toastText");
+    tx.innerHTML = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2400);
+  },
+  setTop: () => {
+    document.getElementById("userPill").textContent = store.display_name ? `ユーザー：${store.display_name}` : "ユーザー：-";
+    const modeLabel = (store.travel_mode === "walking") ? "徒歩" : "車";
+    document.getElementById("modePill").textContent = `移動：${modeLabel}`;
+    document.getElementById("rolePill").textContent = store.role ? `role: ${store.role}` : "未ログイン";
+  }
+};
+
+/** =========================
+ *  Utils
+ * ========================= */
+function isIOS(){
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+function escapeHtml_(s){
+  return String(s||"")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#39;");
+}
+function statusBadge(status){
+  if (status === "done") return `<span class="badge bDone">済</span>`;
+  return `<span class="badge bTodo">未</span>`;
+}
+
+/** =========================
+ *  HTTP
+ * ========================= */
+async function postAction(payload) {
+  if (!GAS_WEBAPP_URL || GAS_WEBAPP_URL.includes("PASTE_YOUR")) {
+    ui.toast("GAS_WEBAPP_URL を設定してください");
+    throw new Error("Missing GAS_WEBAPP_URL");
+  }
+  const res = await fetch(GAS_WEBAPP_URL, {
+    method: "POST",
+    headers: { "Content-Type":"text/plain;charset=utf-8" },
+    body: JSON.stringify(payload),
+  });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); }
+  catch { throw new Error("Bad JSON response: " + text.slice(0,200)); }
+  return data;
+}
+
+/** =========================
+ *  NAV URL (single only)
+ * ========================= */
+function buildAppleSingleUrl(lat, lng, travelMode){
+  const dirflg = (travelMode === "walking") ? "w" : "d";
+  const daddr = encodeURIComponent(`${Number(lat).toFixed(7)},${Number(lng).toFixed(7)}`);
+  return `https://maps.apple.com/?daddr=${daddr}&dirflg=${dirflg}`;
+}
+function buildGoogleSingleUrl(lat, lng, travelMode){
+  const mode = (travelMode === "walking") ? "walking" : "driving";
+  const dest = encodeURIComponent(`${Number(lat).toFixed(7)},${Number(lng).toFixed(7)}`);
+  return `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=${encodeURIComponent(mode)}`;
+}
+
+/** =========================
+ *  Leaflet Map UI (precinct detail only)
+ * ========================= */
+const mapUI = {
+  map: null,
+  cluster: null,
+  markers: new Map(), // point_id -> marker
+
+  myMarker: null,
+  myAccuracyCircle: null,
+
+  ensure(){
+    if (this.map) return;
+    this.map = L.map("map", { zoomControl:true });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(this.map);
+
+    this.cluster = L.markerClusterGroup({
+      chunkedLoading: true, // heavy precincts
+      removeOutsideVisibleBounds: true,
+      spiderfyOnMaxZoom: true
+    });
+    this.map.addLayer(this.cluster);
+  },
+
+  iconForStatus(st){
+    const c = (st === "done") ? "#2fe27d" : "#4f8cff";
+    return L.divIcon({
+      className: "",
+      html: `<div style="width:14px;height:14px;border-radius:999px;background:${c};border:2px solid rgba(255,255,255,.9);box-shadow:0 2px 10px rgba(0,0,0,.25)"></div>`,
+      iconSize: [14,14],
+      iconAnchor: [7,7],
+    });
+  },
+
+  clearPoints(){
+    if (!this.cluster) return;
+    this.cluster.clearLayers();
+    this.markers.clear();
+  },
+
+  clearMyLocation(){
+    if (this.myMarker) { this.map.removeLayer(this.myMarker); this.myMarker = null; }
+    if (this.myAccuracyCircle) { this.map.removeLayer(this.myAccuracyCircle); this.myAccuracyCircle = null; }
+  },
+
+  setMyLocation(lat, lng, accuracy){
+    if (!this.map) return;
+    const ll = [lat, lng];
+    if (!this.myMarker) {
+      this.myMarker = L.circleMarker(ll, {
+        radius: 7,
+        weight: 2,
+        color: "#ffffff",
+        fillColor: "#3aa0ff",
+        fillOpacity: 0.95
+      }).addTo(this.map);
+      this.myMarker.bindPopup("現在地");
+    } else {
+      this.myMarker.setLatLng(ll);
+    }
+
+    if (typeof accuracy === "number" && isFinite(accuracy)) {
+      if (!this.myAccuracyCircle) {
+        this.myAccuracyCircle = L.circle(ll, {
+          radius: accuracy,
+          weight: 1,
+          color: "rgba(58,160,255,.9)",
+          fillColor: "rgba(58,160,255,.25)",
+          fillOpacity: 0.25
+        }).addTo(this.map);
+      } else {
+        this.myAccuracyCircle.setLatLng(ll);
+        this.myAccuracyCircle.setRadius(accuracy);
+      }
+    }
+  },
+
+  render(area){
+    document.getElementById("mapWrap").style.display = "block";
+    this.ensure();
+    this.clearPoints();
+
+    // update filter button UI
+    app.syncFilterButtons_();
+
+    const pts = store.points
+      .filter(p => p.area_id === area)
+      .slice()
+      .sort((a,b)=>a.order_reco-b.order_reco || a.point_id.localeCompare(b.point_id));
+
+    if (pts.length === 0) return;
+
+    const bounds = [];
+    for (const p of pts) {
+      const st = store.state[p.point_id]?.status || "todo";
+
+      if (store.map_filter === "todo" && st !== "todo") continue;
+      if (store.map_filter === "done" && st !== "done") continue;
+
+      const mk = L.marker([p.lat, p.lng], { icon: this.iconForStatus(st) });
+      this.cluster.addLayer(mk);
+      this.markers.set(p.point_id, mk);
+      bounds.push([p.lat, p.lng]);
+      mk.on("click", () => this.openPopup(p));
+    }
+
+    // if filter removed everything, fit to all points instead of empty
+    const fitPts = (bounds.length > 0) ? bounds : pts.map(p => [p.lat, p.lng]);
+    this.map.fitBounds(fitPts, { padding:[24,24] });
+  },
+
+  refreshPoint(point_id){
+    const mk = this.markers.get(point_id);
+    if (!mk) return;
+    const st = store.state[point_id]?.status || "todo";
+    mk.setIcon(this.iconForStatus(st));
+  },
+
+  openPopup(p){
+    const memo = store.state[p.point_id]?.memo || "";
+    const title = `#${p.order_reco} / ${p.point_id}`;
+
+    const html = `
+      <div style="font-size:13px;font-weight:900;margin-bottom:6px">${title}</div>
+      <div style="font-size:12px;opacity:.85;white-space:pre-wrap">${escapeHtml_((p.name||"").trim())}\n${escapeHtml_((p.address||"").trim())}</div>
+      ${memo ? `<div style="font-size:12px;margin-top:6px">📝 ${escapeHtml_(memo)}</div>` : ``}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+        <button onclick="app.startSingleNav('${p.point_id}')" style="padding:8px 10px;border-radius:10px;border:none;background:#4f8cff;color:#fff;font-weight:800">
+          ナビ
+        </button>
+        <button onclick="app.handlePointAction('done','${p.point_id}')" style="padding:8px 10px;border-radius:10px;border:none;background:#2fe27d;color:#052012;font-weight:900">済</button>
+        <button onclick="app.handlePointAction('todo','${p.point_id}')" style="padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.15);background:#fff;color:#111;font-weight:800">未に戻す</button>
+        <button onclick="app.handlePointAction('memo','${p.point_id}')" style="padding:8px 10px;border-radius:10px;border:1px solid rgba(0,0,0,.15);background:#fff;color:#111;font-weight:800">メモ</button>
+      </div>
+    `;
+
+    const mk = this.markers.get(p.point_id);
+    if (mk) mk.bindPopup(html).openPopup();
+  }
+};
+
+/** =========================
+ *  GPS helpers
+ * ========================= */
+function startGpsWatch_(){
+  const hint = document.getElementById("gpsHint");
+  if (!navigator.geolocation) {
+    hint.textContent = "※この端末/ブラウザは位置情報に対応していません。";
+    return;
+  }
+  // already watching
+  if (store.gps_watch_id != null) return;
+
+  store.gps_watch_id = navigator.geolocation.watchPosition(
+    (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const acc = pos.coords.accuracy;
+      store.my_latlng = { lat, lng, acc };
+      hint.textContent = "現在地：取得中（表示中）";
+      mapUI.setMyLocation(lat, lng, acc);
+    },
+    (err) => {
+      hint.textContent = "※現在地を表示するには位置情報を許可してください。";
+      // do not spam toast repeatedly
+    },
+    { enableHighAccuracy: true, maximumAge: 15000, timeout: 12000 }
+  );
+}
+
+function stopGpsWatch_(){
+  if (store.gps_watch_id != null && navigator.geolocation) {
+    navigator.geolocation.clearWatch(store.gps_watch_id);
+    store.gps_watch_id = null;
+  }
+}
+
+/** =========================
+ *  APP
+ * ========================= */
+const app = {
+  async init(){
+    ui.setTop();
+    app.bindSettings();
+    if (!store.user_id) {
+      app.showAuth();
+      return;
+    }
+    await app.bootstrap();
+  },
+
+  showAuth(){
+    document.getElementById("authView").style.display = "block";
+    document.getElementById("fieldView").style.display = "none";
+    document.getElementById("allocView").style.display = "none";
+    document.getElementById("tabs").style.display = "none";
+  },
+
+  async register(){
+    const nickname = document.getElementById("inNick").value.trim();
+    const id_name  = document.getElementById("inIdName").value.trim();
+    if (!nickname || !id_name) { ui.toast("必須項目を入力してください"); return; }
+
+    ui.toast("ログイン中…");
+    const data = await postAction({ action:"register", nickname, id_name });
+    if (!data.ok) {
+      if (data.error === "NOT_ALLOWED") ui.toast("ログインできません（ホワイトリスト未登録/無効）");
+      else ui.toast("ログイン失敗：" + (data.error || "不明"));
+      return;
+    }
+
+    store.user_id = data.user.user_id;
+    store.display_name = data.user.display_name;
+    store.role = data.user.role;
+
+    localStorage.setItem("user_id", store.user_id);
+    localStorage.setItem("display_name", store.display_name);
+    localStorage.setItem("role", store.role);
+    localStorage.setItem("travel_mode", store.travel_mode);
+
+    ui.setTop();
+    await app.bootstrap();
+  },
+
+  async bootstrap(){
+    ui.toast("読み込み中…");
+    const data = await postAction({ action:"bootstrap", user_id: store.user_id });
+    if (!data.ok) {
+      ui.toast("認証エラー。ログアウトします");
+      app.logout();
+      return;
+    }
+
+    store.display_name = data.user.display_name || store.display_name;
+    store.role = data.user.role || store.role;
+    localStorage.setItem("display_name", store.display_name);
+    localStorage.setItem("role", store.role);
+
+    store.assigned_areas = data.assigned_areas || [];
+    store.points = data.points || [];
+    store.state = data.state || {};
+
+    ui.setTop();
+
+    const tabs = document.getElementById("tabs");
+    tabs.style.display = "flex";
+    const canAlloc = (store.role === "allocator" || store.role === "planner");
+    document.getElementById("tabAlloc").style.display = canAlloc ? "block" : "none";
+
+    app.switchTab("field");
+    app.renderPrecinctList();
+  },
+
+  async reload(){
+    if (!store.user_id) { app.showAuth(); return; }
+    await app.bootstrap();
+    if (store.role === "allocator" || store.role === "planner") {
+      if (document.getElementById("tabAlloc").classList.contains("active")) {
+        await app.loadAllocatorData();
+      }
+    }
+  },
+
+  logout(){
+    localStorage.removeItem("user_id");
+    localStorage.removeItem("display_name");
+    localStorage.removeItem("role");
+    store.user_id = "";
+    store.display_name = "";
+    store.role = "";
+    store.assigned_areas = [];
+    store.points = [];
+    store.state = {};
+    store.current_area = "";
+    stopGpsWatch_();
+    ui.setTop();
+    app.showAuth();
+  },
+
+  switchTab(which){
+    document.getElementById("tabField").classList.toggle("active", which==="field");
+    document.getElementById("tabAlloc").classList.toggle("active", which==="alloc");
+
+    document.getElementById("fieldView").style.display = which==="field" ? "block" : "none";
+    document.getElementById("allocView").style.display = which==="alloc" ? "block" : "none";
+    document.getElementById("authView").style.display = "none";
+
+    if (which==="alloc") {
+      if (!(store.role === "allocator" || store.role === "planner")) {
+        ui.toast("権限がありません");
+        app.switchTab("field");
+        return;
+      }
+      app.loadAllocatorData().catch(err => ui.toast("割当データ取得に失敗：" + err.message));
+    }
+  },
+
+  openTravelModePicker(){
+    const current = store.travel_mode;
+    const opts = [
+      {key:"driving", label:"車（おすすめ）"},
+      {key:"walking", label:"徒歩"},
+    ];
+    const msg = opts.map(o => `${o.key===current?"●":"○"} ${o.label}`).join("\n");
+    const chosen = prompt("移動手段を入力してください（driving / walking）\n\n" + msg, current);
+    if (!chosen) return;
+    const v = chosen.trim();
+    if (!["driving","walking"].includes(v)) { ui.toast("入力が正しくありません"); return; }
+    store.travel_mode = v;
+    localStorage.setItem("travel_mode", store.travel_mode);
+    ui.setTop();
+    ui.toast("移動手段を変更しました");
+  },
+
+  /** -------- Field -------- */
+  renderPrecinctList(){
+    const el = document.getElementById("precinctList");
+    el.innerHTML = "";
+
+    if (!store.assigned_areas || store.assigned_areas.length === 0) {
+      el.innerHTML = `
+        <div class="item">
+          <div class="itemTitle">割当なし</div>
+          <div class="itemSub">責任者が投票区を割り当てるまで、ここには表示されません。</div>
+        </div>`;
+      return;
+    }
+
+    const pointsByArea = new Map();
+    for (const p of store.points) {
+      if (!pointsByArea.has(p.area_id)) pointsByArea.set(p.area_id, []);
+      pointsByArea.get(p.area_id).push(p);
+    }
+
+    for (const area of store.assigned_areas.slice().sort()) {
+      const pts = (pointsByArea.get(area) || []).slice().sort((a,b)=>a.order_reco-b.order_reco || a.point_id.localeCompare(b.point_id));
+      const total = pts.length;
+      const todo = pts.filter(x => (store.state[x.point_id]?.status || "todo")==="todo").length;
+      const done = pts.filter(x => (store.state[x.point_id]?.status || "todo")==="done").length;
+
+      const item = document.createElement("div");
+      item.className = "item";
+      item.innerHTML = `
+        <div class="itemTop">
+          <div>
+            <div class="itemTitle">${area}（投票区）</div>
+            <div class="itemSub">地点：${total} / 未：${todo} / 済：${done}</div>
+          </div>
+          <div class="right">
+            <button class="btn small primary">開く</button>
+          </div>
+        </div>
+      `;
+      item.querySelector("button").onclick = () => app.openPrecinct(area);
+      el.appendChild(item);
+    }
+  },
+
+  openPrecinct(area){
+    store.current_area = area;
+    document.getElementById("precinctDetail").style.display = "block";
+
+    const pts = store.points
+      .filter(p => p.area_id === area)
+      .slice()
+      .sort((a,b)=>a.order_reco-b.order_reco || a.point_id.localeCompare(b.point_id));
+
+    const total = pts.length;
+    const todo = pts.filter(x => (store.state[x.point_id]?.status || "todo")==="todo").length;
+    const modeLabel = (store.travel_mode === "walking") ? "徒歩" : "車";
+    document.getElementById("precTitle").textContent = `${area}（投票区）`;
+    document.getElementById("precSub").textContent = `地点数：${total} / 未訪問：${todo} / 移動手段：${modeLabel}`;
+
+    // map + gps
+    document.getElementById("mapWrap").style.display = "block";
+    mapUI.render(area);
+    startGpsWatch_();
+
+    app.renderPointList();
+    window.scrollTo({top:0, behavior:"smooth"});
+  },
+
+  closePrecinct(){
+    store.current_area = "";
+    document.getElementById("precinctDetail").style.display = "none";
+    document.getElementById("mapWrap").style.display = "none";
+    // keep gps watch running? → stop to save battery
+    stopGpsWatch_();
+    app.renderPrecinctList();
+  },
+
+  renderPointList(){
+    const area = store.current_area;
+    const list = document.getElementById("pointList");
+    list.innerHTML = "";
+    if (!area) return;
+
+    const pts = store.points
+      .filter(p => p.area_id === area)
+      .slice()
+      .sort((a,b)=>a.order_reco-b.order_reco || a.point_id.localeCompare(b.point_id));
+
+    for (const p of pts) {
+      const st = store.state[p.point_id]?.status || "todo";
+      const memo = store.state[p.point_id]?.memo || "";
+
+      const item = document.createElement("div");
+      item.className = "item";
+      item.innerHTML = `
+        <div class="itemTop">
+          <div>
+            <div class="itemTitle">#${p.order_reco} / ${p.point_id} ${statusBadge(st)}</div>
+            <div class="itemSub">${(p.name||"").trim()}\n${(p.address||"").trim()}</div>
+            ${memo ? `<div class="itemSub">📝 ${escapeHtml_(memo)}</div>` : ``}
+          </div>
+          <div class="right">
+            <button class="btn small" title="単点ナビ">単点ナビ</button>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn small ok" data-act="done">済</button>
+          <button class="btn small" data-act="todo">未に戻す</button>
+          <button class="btn small ghost" data-act="memo">メモ</button>
+        </div>
+      `;
+
+      item.querySelector(`button[title="単点ナビ"]`).onclick = () => app.startSingleNav(p.point_id);
+      item.querySelectorAll(`button[data-act]`).forEach(btn=>{
+        btn.onclick = () => app.handlePointAction(btn.dataset.act, p.point_id);
+      });
+
+      list.appendChild(item);
+    }
+  },
+
+  getTodoPointsInArea(area){
+    const pts = store.points
+      .filter(p => p.area_id === area)
+      .slice()
+      .sort((a,b)=>a.order_reco-b.order_reco || a.point_id.localeCompare(b.point_id));
+    return pts.filter(p => (store.state[p.point_id]?.status || "todo") === "todo");
+  },
+
+  async startNavRecommended(){
+    const area = store.current_area;
+    if (!area) { ui.toast("投票区を開いてください"); return; }
+    const todoPts = app.getTodoPointsInArea(area);
+    if (todoPts.length === 0) { ui.toast("未訪問がありません"); return; }
+    await app.startSingleNav(todoPts[0].point_id);
+  },
+
+  async pickNextPoint(){
+    const area = store.current_area;
+    if (!area) { ui.toast("投票区を開いてください"); return; }
+    const todoPts = app.getTodoPointsInArea(area);
+    if (todoPts.length === 0) { ui.toast("未訪問がありません"); return; }
+
+    const options = todoPts.slice(0, 30).map(p=>`#${p.order_reco} ${p.point_id} ${(p.name||"").slice(0,18)}`).join("\n");
+    const input = prompt("次に行く地点の point_id を入力してください（未訪問から）\n\n候補（先頭30）:\n" + options, todoPts[0].point_id);
+    if (!input) return;
+
+    const pid = input.trim();
+    const p = todoPts.find(x=>x.point_id===pid);
+    if (!p) { ui.toast("未訪問の point_id を入力してください"); return; }
+    await app.startSingleNav(p.point_id);
+  },
+
+  async startSingleNav(point_id){
+    const p = store.points.find(x=>x.point_id===point_id);
+    if (!p) { ui.toast("地点が見つかりません"); return; }
+
+    const url = isIOS()
+      ? buildAppleSingleUrl(p.lat, p.lng, store.travel_mode)
+      : buildGoogleSingleUrl(p.lat, p.lng, store.travel_mode);
+
+    await postAction({
+      action:"nav_start",
+      actor_user_id: store.user_id,
+      area_id: p.area_id,
+      included_point_ids: [p.point_id],
+      maps_url: url,
+      client_time: new Date().toISOString()
+    });
+
+    window.open(url, "_blank");
+  },
+
+  async handlePointAction(action, point_id){
+    const p = store.points.find(x=>x.point_id===point_id);
+    if (!p) { ui.toast("地点が見つかりません"); return; }
+
+    let status = action;
+    let memo = store.state[point_id]?.memo || "";
+
+    if (action === "memo") {
+      const m = prompt("メモを入力してください", memo);
+      if (m === null) return;
+      memo = m.trim();
+      status = store.state[point_id]?.status || "todo";
+    } else if (!["todo","done"].includes(action)) {
+      ui.toast("未対応の操作です");
+      return;
+    }
+
+    const data = await postAction({
+      action:"state_update",
+      actor_user_id: store.user_id,
+      updates: [{
+        point_id,
+        status,
+        memo,
+        client_time: new Date().toISOString()
+      }]
+    });
+
+    if (!data.ok) { ui.toast("更新失敗：" + (data.error||"")); return; }
+    const r = (data.results||[]).find(x=>x.point_id===point_id);
+    if (r && !r.ok) { ui.toast("更新拒否：" + (r.error||"")); return; }
+
+    store.state[point_id] = { status, memo };
+    ui.toast("更新しました");
+
+    // rerender list + map marker + clustering may change
+    app.openPrecinct(p.area_id);
+  },
+
+  /** -------- Map filter & GPS controls -------- */
+  setMapFilter(mode){
+    store.map_filter = mode;
+    if (store.current_area) mapUI.render(store.current_area);
+  },
+
+  syncFilterButtons_(){
+    const all = document.getElementById("btnFilterAll");
+    const todo = document.getElementById("btnFilterTodo");
+    const done = document.getElementById("btnFilterDone");
+    if (!all || !todo || !done) return;
+
+    const onStyle = (btn) => { btn.classList.add("primary"); btn.classList.remove("ghost"); };
+    const offStyle = (btn) => { btn.classList.remove("primary"); btn.classList.add("ghost"); };
+
+    // start with all ghost
+    [all,todo,done].forEach(offStyle);
+    if (store.map_filter === "todo") onStyle(todo);
+    else if (store.map_filter === "done") onStyle(done);
+    else onStyle(all);
+  },
+
+  recenterToMyLocation(){
+    if (!mapUI.map) return;
+    if (store.my_latlng) {
+      mapUI.map.setView([store.my_latlng.lat, store.my_latlng.lng], Math.max(mapUI.map.getZoom(), 16));
+      ui.toast("現在地に移動しました");
+      return;
+    }
+    ui.toast("現在地がまだ取得できていません");
+  },
+
+  /** -------- Allocator -------- */
+  async loadAllocatorData(){
+    const usersResp = await postAction({ action:"alloc_list_users", actor_user_id: store.user_id });
+    const assnResp  = await postAction({ action:"alloc_list_assignments", actor_user_id: store.user_id });
+
+    if (!usersResp.ok || !assnResp.ok) {
+      ui.toast("割当データ取得に失敗（権限/設定を確認）");
+      store.allUsers = [];
+      store.assignments = [];
+      app.renderUserCandidates();
+      app.renderAssignments();
+      return;
+    }
+
+    store.allUsers = usersResp.users || [];
+    store.assignments = assnResp.assignments || [];
+    store.selectedAreas = new Set();
+    app.renderUserCandidates();
+    app.renderAssignments();
+  },
+
+  renderUserCandidates(){
+    const q = (document.getElementById("inUserSearch")?.value || "").trim().toLowerCase();
+    const el = document.getElementById("userCandidates");
+    if (!el) return;
+    el.innerHTML = "";
+
+    const list = store.allUsers
+      .filter(u => (u.status||"active")==="active")
+      .filter(u => (u.role==="field" || u.role==="allocator" || u.role==="planner"))
+      .filter(u => !q || (u.display_name||"").toLowerCase().includes(q))
+      .slice(0, 8);
+
+    if (list.length === 0) {
+      el.innerHTML = `<div class="item"><div class="itemTitle">候補なし</div></div>`;
+      return;
+    }
+
+    for (const u of list) {
+      const item = document.createElement("div");
+      item.className = "item";
+      const selected = store.selectedAssignee && store.selectedAssignee.user_id === u.user_id;
+      item.innerHTML = `
+        <div class="itemTop">
+          <div>
+            <div class="itemTitle">${selected ? "✅ " : ""}${u.display_name}</div>
+            <div class="itemSub">role: ${u.role} / user_id: <span class="mono">${u.user_id}</span></div>
+          </div>
+          <button class="btn small primary">選択</button>
+        </div>
+      `;
+      item.querySelector("button").onclick = () => {
+        store.selectedAssignee = { user_id: u.user_id, display_name: u.display_name };
+        ui.toast("担当者を選択しました");
+        app.renderUserCandidates();
+      };
+      el.appendChild(item);
+    }
+  },
+
+  renderAssignments(){
+    const el = document.getElementById("assignList");
+    if (!el) return;
+    el.innerHTML = "";
+
+    const list = (store.assignments || []).slice().sort((a,b)=>String(a.area_id).localeCompare(String(b.area_id)));
+
+    for (const a of list) {
+      const area = a.area_id;
+      const checked = store.selectedAreas.has(area);
+      const item = document.createElement("div");
+      item.className = "item";
+      item.innerHTML = `
+        <div class="itemTop">
+          <div>
+            <div class="itemTitle">
+              <input class="checkbox" type="checkbox" ${checked ? "checked":""} />
+              <span style="margin-left:8px">${area}</span>
+              <span class="badge" style="margin-left:8px">v${a.version}</span>
+              <span class="badge" style="margin-left:6px">${a.status}</span>
+            </div>
+            <div class="itemSub">担当：${a.assignee_display_name || "（未割当）"}</div>
+            <div class="tiny">更新：${a.updated_at || "-"} / by: ${a.updated_by_name || "-"}</div>
+          </div>
+        </div>
+      `;
+      item.querySelector("input").onchange = (e) => {
+        if (e.target.checked) store.selectedAreas.add(area);
+        else store.selectedAreas.delete(area);
+      };
+      el.appendChild(item);
+    }
+  },
+
+  async bulkAssign(){
+    if (!store.selectedAssignee) { ui.toast("担当者を選択してください"); return; }
+    if (store.selectedAreas.size === 0) { ui.toast("投票区を選択してください"); return; }
+
+    const note = (document.getElementById("inAssignNote").value || "").trim();
+    const ops = [];
+    for (const area of store.selectedAreas) {
+      const a = store.assignments.find(x=>x.area_id===area);
+      if (!a) continue;
+      ops.push({
+        area_id: area,
+        action: "assign",
+        assignee_user_id: store.selectedAssignee.user_id,
+        expected_version: Number(a.version),
+        note
+      });
+    }
+
+    const resp = await postAction({
+      action:"alloc_update",
+      actor_user_id: store.user_id,
+      ops
+    });
+
+    if (!resp.ok) { ui.toast("割当失敗：" + (resp.error||"")); return; }
+
+    let conflict = 0, ok = 0;
+    for (const r of (resp.results||[])) {
+      if (r.ok) {
+        ok++;
+        const a = store.assignments.find(x=>x.area_id===r.area_id);
+        if (a) {
+          a.version = r.new_version;
+          a.status = "assigned";
+          a.assignee_user_id = store.selectedAssignee.user_id;
+          a.assignee_display_name = store.selectedAssignee.display_name;
+          a.updated_at = new Date().toISOString();
+          a.updated_by_name = store.display_name;
+        }
+      } else if (r.error === "CONFLICT") conflict++;
+    }
+
+    ui.toast(`割当：成功${ok} / 競合${conflict}`);
+    app.renderAssignments();
+  },
+
+  async bulkUnassign(){
+    if (store.selectedAreas.size === 0) { ui.toast("投票区を選択してください"); return; }
+    const note = (document.getElementById("inAssignNote").value || "").trim();
+
+    const ops = [];
+    for (const area of store.selectedAreas) {
+      const a = store.assignments.find(x=>x.area_id===area);
+      if (!a) continue;
+      ops.push({
+        area_id: area,
+        action: "unassign",
+        expected_version: Number(a.version),
+        note
+      });
+    }
+
+    const resp = await postAction({
+      action:"alloc_update",
+      actor_user_id: store.user_id,
+      ops
+    });
+
+    if (!resp.ok) { ui.toast("解除失敗：" + (resp.error||"")); return; }
+
+    let conflict = 0, ok = 0;
+    for (const r of (resp.results||[])) {
+      if (r.ok) {
+        ok++;
+        const a = store.assignments.find(x=>x.area_id===r.area_id);
+        if (a) {
+          a.version = r.new_version;
+          a.status = "unassigned";
+          a.assignee_user_id = "";
+          a.assignee_display_name = "";
+          a.updated_at = new Date().toISOString();
+          a.updated_by_name = store.display_name;
+        }
+      } else if (r.error === "CONFLICT") conflict++;
+    }
+
+    ui.toast(`解除：成功${ok} / 競合${conflict}`);
+    app.renderAssignments();
+  },
+
+  async allowlistAdd(){
+    const nickname = (document.getElementById("alNick").value || "").trim();
+    const id_name  = (document.getElementById("alIdName").value || "").trim();
+    const note     = (document.getElementById("alNote").value || "").trim();
+    if (!nickname || !id_name) { ui.toast("必須項目を入力してください"); return; }
+
+    const resp = await postAction({
+      action:"allowlist_add",
+      actor_user_id: store.user_id,
+      nickname,
+      id_name,
+      note
+    });
+    if (!resp.ok) { ui.toast("追加失敗：" + (resp.error||"")); return; }
+    ui.toast("追加しました： " + resp.allow_id);
+    document.getElementById("alNick").value = "";
+    document.getElementById("alIdName").value = "";
+    document.getElementById("alNote").value = "";
+  },
+
+  async allowlistDisable(){
+    const allow_id = (document.getElementById("alDisableId").value || "").trim();
+    if (!allow_id) { ui.toast("allow_id を入力してください"); return; }
+    const resp = await postAction({
+      action:"allowlist_disable",
+      actor_user_id: store.user_id,
+      allow_id
+    });
+    if (!resp.ok) { ui.toast("無効化失敗：" + (resp.error||"")); return; }
+    ui.toast("無効化しました");
+    document.getElementById("alDisableId").value = "";
+  },
+
+  bindSettings(){
+    const btnSettings = document.getElementById("btnSettings");
+    const modal = document.getElementById("settingsModal");
+    const btnClose = document.getElementById("btnCloseSettings");
+    const btnLogout2 = document.getElementById("btnLogoutInSettings");
+    const userBox = document.getElementById("currentUserBox");
+
+    function openSettings(){
+      if (store.user_id) userBox.textContent = `ログイン中：${store.display_name}（${store.role}）`;
+      else userBox.textContent = "未ログイン";
+      modal.style.display = "block";
+    }
+    function closeSettings(){ modal.style.display = "none"; }
+
+    btnSettings.addEventListener("click", openSettings);
+    btnClose.addEventListener("click", closeSettings);
+    modal.addEventListener("click", (e)=>{ if (e.target === modal) closeSettings(); });
+
+    btnLogout2.addEventListener("click", ()=>{
+      app.logout();
+      closeSettings();
+    });
+  }
+};
+
+window.app = app;
+app.init();
+</script>
+</body>
+</html>
