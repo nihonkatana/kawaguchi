@@ -20,8 +20,8 @@
       --text:#eef2ff;
       --accent:#4f8cff;
 
-      /* 色の誤認防止：済は“落ち着いた緑”、未は“強めに目立つ青” */
-      --done:#1fb56a;      /* 蛍光回避 */
+      /* 誤認防止：済は“落ち着いた緑”、未は“強めに目立つ青” */
+      --done:#1fb56a;
       --done2:#158d53;
       --todo:#3d7cff;
 
@@ -69,6 +69,7 @@
     .btn.primary{background:var(--accent)}
     .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.16)}
     .btn.small{padding:12px 14px;font-size:15px;border-radius:14px}
+    .btn.tiny{padding:10px 12px;font-size:14px;border-radius:12px}
     .btn.block{width:100%}
 
     /* 誤認防止：『済』ボタンは“控えめ”に（押して初めて済になる） */
@@ -165,8 +166,10 @@
     .field::placeholder{color:rgba(167,176,192,.7)}
 
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
     @media (max-width:420px){
       .grid2{grid-template-columns:1fr}
+      .grid3{grid-template-columns:1fr}
     }
 
     .tabs{
@@ -194,7 +197,7 @@
     .toast.show{display:block}
     .toast .card{margin:0}
 
-    /* Leaflet Popup (地図ピンのメニュー) を読みやすく（濃い背景＋白文字） */
+    /* Leaflet Popup（濃い背景＋白文字） */
     .leaflet-popup-content-wrapper, .leaflet-popup-tip{
       background: rgba(18,26,43,.98);
       color: var(--text);
@@ -214,6 +217,20 @@
       overflow:hidden;
       background:#0b0f1a;
     }
+
+    /* summary */
+    .kpiRow{display:flex; gap:10px; flex-wrap:wrap}
+    .kpiBox{
+      flex:1;
+      min-width:140px;
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.05);
+    }
+    .kpiBig{font-size:22px;font-weight:1000;margin-top:4px}
+    .kpiSmall{font-size:13px;color:rgba(167,176,192,.9)}
+    .hint{font-size:13px;color:rgba(167,176,192,.92);line-height:1.45}
   </style>
 </head>
 
@@ -312,12 +329,67 @@
       </div>
     </div>
 
-    <!-- ALLOCATOR（今回はそのまま：後で実装） -->
+    <!-- SUMMARY -->
+    <div id="summaryView" style="display:none">
+      <div class="card">
+        <div class="row space">
+          <div>
+            <div class="h2">集計（未/済 + メモ）</div>
+            <div class="hint" id="summaryScopeHint">
+              読み込み中…
+            </div>
+          </div>
+          <button class="btn small" onclick="app.summaryReload(true)">更新</button>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="kpiRow">
+          <div class="kpiBox">
+            <div class="kpiSmall">合計</div>
+            <div class="kpiBig" id="kpiTotal">-</div>
+          </div>
+          <div class="kpiBox">
+            <div class="kpiSmall">未</div>
+            <div class="kpiBig" id="kpiTodo">-</div>
+          </div>
+          <div class="kpiBox">
+            <div class="kpiSmall">済</div>
+            <div class="kpiBig" id="kpiDone">-</div>
+          </div>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="h3">絞り込み（AND）</div>
+        <div class="grid2" style="margin-top:8px">
+          <select id="sumArea" class="field" onchange="app.renderSummaryList()">
+            <option value="">投票区：すべて</option>
+          </select>
+          <select id="sumStatus" class="field" onchange="app.renderSummaryList()">
+            <option value="">状態：すべて</option>
+            <option value="todo">未</option>
+            <option value="done">済</option>
+          </select>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="row space">
+          <div class="h3" style="margin:0">一覧</div>
+          <div class="muted" id="summaryCount" style="font-size:14px">-</div>
+        </div>
+
+        <div id="summaryList" class="list" style="margin-top:10px"></div>
+      </div>
+    </div>
+
+    <!-- ALLOCATOR（次ステップ） -->
     <div id="allocView" style="display:none">
       <div class="card">
         <div class="h2">割当（責任者）</div>
         <div class="muted" style="font-size:13px;line-height:1.5">
-          allocator / planner のUIは、次のステップで実装します（今回は現場＋地図＋部分更新を優先）。
+          allocator / planner の割当UIは次のステップで実装します。集計タブは全員利用できます。
         </div>
       </div>
     </div>
@@ -325,6 +397,7 @@
 
   <div class="tabs" id="tabs" style="display:none">
     <div class="tab active" id="tabField" onclick="app.switchTab('field')">現場</div>
+    <div class="tab" id="tabSummary" onclick="app.switchTab('summary')">集計</div>
     <div class="tab" id="tabAlloc" onclick="app.switchTab('alloc')">責任者</div>
   </div>
 
@@ -351,6 +424,10 @@ const store = {
   map: null,
   mapMarkers: [],
   mapMarkerByPid: {},
+
+  // summary cache
+  summary: null, // {scope,kpi,by_area,points}
+  summary_loaded_at: 0,
 };
 
 /** =========================
@@ -426,6 +503,7 @@ const app = {
     document.getElementById("authView").style.display = "block";
     document.getElementById("fieldView").style.display = "none";
     document.getElementById("allocView").style.display = "none";
+    document.getElementById("summaryView").style.display = "none";
     document.getElementById("tabs").style.display = "none";
   },
 
@@ -473,12 +551,19 @@ const app = {
     store.points = data.points || [];
     store.state = data.state || {};
 
+    // bootstrap したら summary を古い扱いに（必要時ロード）
+    store.summary = null;
+    store.summary_loaded_at = 0;
+
     ui.setTop();
 
     const tabs = document.getElementById("tabs");
     tabs.style.display = "flex";
     const canAlloc = (store.role === "allocator" || store.role === "planner");
     document.getElementById("tabAlloc").style.display = canAlloc ? "block" : "none";
+
+    // 集計タブは全員OK
+    document.getElementById("tabSummary").style.display = "block";
 
     app.switchTab("field");
     app.renderPrecinctList();
@@ -501,15 +586,19 @@ const app = {
     store.points = [];
     store.state = {};
     store.current_area = "";
+    store.summary = null;
+    store.summary_loaded_at = 0;
     ui.setTop();
     app.showAuth();
   },
 
   switchTab(which){
     document.getElementById("tabField").classList.toggle("active", which==="field");
+    document.getElementById("tabSummary").classList.toggle("active", which==="summary");
     document.getElementById("tabAlloc").classList.toggle("active", which==="alloc");
 
     document.getElementById("fieldView").style.display = which==="field" ? "block" : "none";
+    document.getElementById("summaryView").style.display = which==="summary" ? "block" : "none";
     document.getElementById("allocView").style.display = which==="alloc" ? "block" : "none";
     document.getElementById("authView").style.display = "none";
 
@@ -519,6 +608,11 @@ const app = {
         app.switchTab("field");
         return;
       }
+    }
+
+    if (which==="summary") {
+      // 初回 or 古い場合にロード
+      app.summaryReload(false).catch(err => ui.toast("集計取得に失敗：" + err.message));
     }
   },
 
@@ -536,7 +630,6 @@ const app = {
   },
 
   areaLabel_(areaId){
-    // P001 -> 1
     const m = String(areaId||"").match(/P(\d+)/i);
     if (!m) return String(areaId||"");
     return String(parseInt(m[1],10));
@@ -665,23 +758,19 @@ const app = {
 
     const y = keepScroll ? window.scrollY : 0;
 
-    // 1) リスト再描画（現状は簡潔に全件を再描画）
     app.renderPointList();
 
-    // 2) 投票区上部の集計テキスト更新
     const pts = store.points.filter(p=>p.area_id===area);
     const total = pts.length;
     const todo = pts.filter(p => (store.state[p.point_id]?.status || "todo")==="todo").length;
     const modeLabel = store.travel_mode === "walking" ? "徒歩" : "車";
     document.getElementById("precSub").textContent = `地点数：${total} / 未訪問：${todo} / 移動：${modeLabel}`;
 
-    // 3) 地図マーカーの色だけ更新（該当が分かる場合）
     if (store.mapMarkerByPid && touched_point_id && store.mapMarkerByPid[touched_point_id]) {
       const mk = store.mapMarkerByPid[touched_point_id];
       const st = store.state[touched_point_id]?.status || "todo";
       app.setMarkerStyle_(mk, st);
     } else {
-      // ざっくり再描画（安全）
       app.renderMapForArea_(area);
     }
 
@@ -766,9 +855,6 @@ const app = {
   async startSingleNav(point_id){
     const p = store.points.find(x=>x.point_id===point_id);
     if (!p) { ui.toast("地点が見つかりません"); return; }
-
-    // iPhone では Apple Maps を使いたい場合、ここを将来的に分岐できます。
-    // 現状はGoogle Mapsの単点dir（Current Location -> 目的地）で統一。
     const url = buildDirUrl([encodeLoc(p.lat,p.lng)], store.travel_mode);
 
     await postAction({
@@ -822,6 +908,9 @@ const app = {
 
     // 同じ投票区画面のまま、部分更新（ページトップへ戻さない）
     app.refreshCurrentPrecinct_({ keepScroll:true, touched_point_id: point_id });
+
+    // summary キャッシュは古い扱い（次回開いたとき更新される）
+    store.summary_loaded_at = 0;
   },
 
   /** -------- Leaflet Map -------- */
@@ -842,17 +931,11 @@ const app = {
       }).addTo(store.map);
     }
 
-    // clear markers
-    for (const m of store.mapMarkers) {
-      try { m.remove(); } catch(e){}
-    }
+    for (const m of store.mapMarkers) { try { m.remove(); } catch(e){} }
     store.mapMarkers = [];
     store.mapMarkerByPid = {};
 
-    // markers（未=青 / 済=緑） ※同一座標が多いと“ピンが少なく見える”ので、見た目だけ少し散らします
-    store.mapMarkerByPid = {};
-
-    // 1) 同一座標グルーピング（小数6桁で丸め）
+    // 同一座標が多いとピンが重なって見えないので、見た目だけ少し散らす（jitter）
     const groups = new Map(); // key -> [p,...]
     for (const p of pts) {
       const lat = Number(p.lat), lng = Number(p.lng);
@@ -864,7 +947,6 @@ const app = {
 
     function jitterLatLng(lat, lng, i, n){
       if (n <= 1) return [lat, lng];
-      // 1〜3m 程度の“見た目のズレ”（ナビ座標は元のまま）
       const rMeters = 2.2;
       const ang = (Math.PI * 2) * (i / n);
       const dLat = (rMeters * Math.cos(ang)) / 111111;
@@ -894,11 +976,10 @@ const app = {
           opacity: 1,
         });
 
-        // popup with actions（読みやすい色に）
-        const btnSingle = `<button class="btn small">単点ナビ</button>`;
-        const btnDone   = `<button class="btn small done">${isDone ? "済（現在）" : "済にする"}</button>`;
-        const btnTodo   = `<button class="btn small todo">未に戻す</button>`;
-        const btnMemo   = `<button class="btn small memo">メモ</button>`;
+        const btnSingle = `<button class="btn tiny">単点ナビ</button>`;
+        const btnDone   = `<button class="btn tiny done">${isDone ? "済（現在）" : "済にする"}</button>`;
+        const btnTodo   = `<button class="btn tiny todo">未に戻す</button>`;
+        const btnMemo   = `<button class="btn tiny memo">メモ</button>`;
 
         const htmlPopup = `
           <div style="font-weight:1000; margin-bottom:8px; font-size:16px;">${label}</div>
@@ -940,7 +1021,6 @@ const app = {
       }
     }
 
-    // fit bounds
     const latlngsForBounds = pts
       .filter(p => isFinite(Number(p.lat)) && isFinite(Number(p.lng)))
       .map(p => [Number(p.lat), Number(p.lng)]);
@@ -954,7 +1034,144 @@ const app = {
       store.map.invalidateSize(true);
     }
   },
+
+  /** -------- Summary -------- */
+  async summaryReload(force){
+    if (!store.user_id) { app.showAuth(); return; }
+    const ttlMs = 60 * 1000; // 1分キャッシュ
+    const fresh = store.summary && (Date.now() - store.summary_loaded_at) < ttlMs;
+    if (!force && fresh) {
+      app.renderSummaryUI_();
+      return;
+    }
+
+    ui.toast("集計を取得中…");
+    const data = await postAction({ action:"summary", actor_user_id: store.user_id });
+    if (!data.ok) {
+      ui.toast("集計取得失敗：" + (data.error||""));
+      return;
+    }
+
+    store.summary = data;
+    store.summary_loaded_at = Date.now();
+    app.renderSummaryUI_();
+  },
+
+  renderSummaryUI_(){
+    const s = store.summary;
+    if (!s) return;
+
+    // scope 表示
+    const hint = document.getElementById("summaryScopeHint");
+    const isAll = (s.scope === "all");
+    hint.textContent = isAll
+      ? "閲覧範囲：全投票区（planner/allocator）"
+      : "閲覧範囲：自分の担当投票区のみ（現場ユーザ）";
+
+    // KPI
+    document.getElementById("kpiTotal").textContent = String(s.kpi?.total ?? "-");
+    document.getElementById("kpiTodo").textContent  = String(s.kpi?.todo  ?? "-");
+    document.getElementById("kpiDone").textContent  = String(s.kpi?.done  ?? "-");
+
+    // area selector
+    const sel = document.getElementById("sumArea");
+    const current = sel.value;
+    sel.innerHTML = `<option value="">投票区：すべて</option>`;
+    const areas = (s.by_area || []).slice().sort((a,b)=> String(a.area_id).localeCompare(String(b.area_id)));
+    for (const a of areas) {
+      const label = app.areaLabel_(a.area_id);
+      const opt = document.createElement("option");
+      opt.value = String(a.area_id);
+      opt.textContent = `投票区：${label}（未:${a.todo} / 済:${a.done}）`;
+      sel.appendChild(opt);
+    }
+    // 可能なら選択維持
+    if (current && Array.from(sel.options).some(o=>o.value===current)) {
+      sel.value = current;
+    } else {
+      sel.value = "";
+    }
+
+    // status selectorはそのまま（ユーザー選択維持）
+    app.renderSummaryList();
+  },
+
+  renderSummaryList(){
+    const s = store.summary;
+    const list = document.getElementById("summaryList");
+    const cnt = document.getElementById("summaryCount");
+    if (!s) { list.innerHTML = ""; cnt.textContent = "-"; return; }
+
+    const area = document.getElementById("sumArea").value;
+    const status = document.getElementById("sumStatus").value; // "", "todo", "done"
+
+    const all = (s.points || []);
+    const filtered = all.filter(p => {
+      if (area && String(p.area_id) !== String(area)) return false;
+      if (status && String(p.status) !== String(status)) return false;
+      return true;
+    });
+
+    cnt.textContent = `表示：${filtered.length} 件`;
+    list.innerHTML = "";
+
+    if (filtered.length === 0) {
+      list.innerHTML = `
+        <div class="item">
+          <div class="itemTitle">該当なし</div>
+          <div class="itemSub">絞り込み条件を変えてください。</div>
+        </div>
+      `;
+      return;
+    }
+
+    // area -> order -> point_id
+    filtered.sort((a,b)=> String(a.area_id).localeCompare(String(b.area_id)) || Number(a.order_reco)-Number(b.order_reco) || String(a.point_id).localeCompare(String(b.point_id)));
+
+    for (const p of filtered) {
+      const item = document.createElement("div");
+      item.className = "item";
+
+      const badge = (p.status === "done") ? `<span class="badge bDone">済</span>` : `<span class="badge bTodo">未</span>`;
+      const areaLabel = app.areaLabel_(p.area_id);
+
+      const memoLine = (p.memo && String(p.memo).trim())
+        ? `<div class="itemSub">📝 ${escapeHtml_(String(p.memo))}</div>`
+        : `<div class="itemSub muted">📝 （メモなし）</div>`;
+
+      const byLine = (p.by_display_name || p.updated_by_name || "") ? ` / by: ${escapeHtml_(p.by_display_name || p.updated_by_name || "")}` : "";
+      const timeLine = (p.updated_at || p.done_at || "") ? `${escapeHtml_(p.updated_at || p.done_at || "")}` : "-";
+
+      item.innerHTML = `
+        <div class="pointHeader">
+          <div class="pointMain">
+            <span class="mono">投票区:${areaLabel}</span>
+            <span class="mono" style="margin-left:10px">#${p.order_reco}</span>
+            <span class="mono" style="margin-left:8px">${escapeHtml_(p.point_id)}</span>
+          </div>
+          ${badge}
+        </div>
+
+        <div class="itemSub">${escapeHtml_((p.name||"").trim())}\n${escapeHtml_((p.address||"").trim())}</div>
+        ${memoLine}
+        <div class="muted" style="font-size:13px;margin-top:8px">
+          更新：${timeLine}${byLine}
+        </div>
+      `;
+      list.appendChild(item);
+    }
+  }
 };
+
+/** small helper */
+function escapeHtml_(s){
+  return String(s||"")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
 
 window.app = app;
 app.init();
