@@ -4,7 +4,7 @@
   <meta name="robots" content="noindex, nofollow">
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>選挙掲示板ナビルート</title>
+  <title>ポスター掲示場ナビルート</title>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -42,7 +42,7 @@
       <div class="h2">ログイン（初回登録）</div>
       <div class="muted" style="font-size:15px;line-height:1.55">
         ニックネームと識別名を入力してください。<br>
-        識別名は、LINE表示名がある方はその表示名。LINEがない方は周囲が識別できる名前（班名＋氏名など）を入力してください。
+        識別名は、LINE表示名がある方はその表示名。LINEがない方はメンバーが識別できる名前を入力してください。
       </div>
 
       <div style="margin-top:14px">
@@ -718,57 +718,66 @@ const app = {
     }
   },
 
-  getTodoPointsInArea_(areaId){
+  getTodoPointsInArea_(areaId) {
     const pts = store.points
       .filter(p => p.area_id === areaId)
       .slice()
-      .sort((a,b)=>a.order_reco-b.order_reco || a.point_id.localeCompare(b.point_id));
+      .sort((a, b) => a.order_reco - b.order_reco || a.point_id.localeCompare(b.point_id));
     return pts.filter(p => (store.state[p.point_id]?.status || "todo") === "todo");
   },
 
   // 要件：今は単点を基本に（iPhoneのGoogleログイン回避）
-  async startNavRecommended(){
+  async startNavRecommended() {
     const area = store.current_area;
     if (!area) { ui.toast("投票区を開いてください"); return; }
     const todoPts = app.getTodoPointsInArea_(area);
     if (todoPts.length === 0) { ui.toast("未訪問がありません"); return; }
-    await app.startSingleNav(todoPts[0].point_id);
+
+    // ★ await は付けない（タップ直後の同期を崩さない）
+    app.startSingleNav(todoPts[0].point_id);
   },
 
-  async pickNextPoint(){
+  async pickNextPoint() {
     const area = store.current_area;
     if (!area) { ui.toast("投票区を開いてください"); return; }
     const todoPts = app.getTodoPointsInArea_(area);
     if (todoPts.length === 0) { ui.toast("未訪問がありません"); return; }
 
-    const options = todoPts.slice(0, 30).map(p=>`#${p.order_reco} ${p.point_id} ${(p.name||"").slice(0,18)}`).join("\n");
-    const input = prompt("次に行く地点の point_id を入力してください（未訪問から）\n\n候補（先頭30）:\n" + options, todoPts[0].point_id);
+    const options = todoPts.slice(0, 30)
+      .map(p => `#${p.order_reco} ${p.point_id} ${(p.name || "").slice(0, 18)}`)
+      .join("\n");
+    const input = prompt(
+      "次に行く地点の point_id を入力してください（未訪問から）\n\n候補（先頭30）:\n" + options,
+      todoPts[0].point_id
+    );
     if (!input) return;
+
     const pid = input.trim();
-    const hit = todoPts.find(p=>p.point_id===pid);
+    const hit = todoPts.find(p => p.point_id === pid);
     if (!hit) { ui.toast("未訪問の point_id を入力してください"); return; }
-    await app.startSingleNav(pid);
+
+    // ★ await は付けない
+    app.startSingleNav(pid);
   },
 
-  async startSingleNav(point_id){
-    const p = store.points.find(x=>x.point_id===point_id);
+  async startSingleNav(point_id) {
+    const p = store.points.find(x => x.point_id === point_id);
     if (!p) { ui.toast("地点が見つかりません"); return; }
 
     const url = buildSingleNavUrl(p.lat, p.lng, store.travel_mode);
 
-    // log
-    try{
-      await postAction({
-        action:"nav_start",
-        actor_user_id: store.user_id,
-        area_id: p.area_id,
-        included_point_ids: [p.point_id],
-        maps_url: url,
-        client_time: new Date().toISOString()
-      });
-    }catch(e){ /* logging failure is non-fatal */ }
-
+    // ★ 先に開く（iPhone対策の核心）
     openNavInNewTab(url);
+
+    // ★ ログは後で投げる（awaitしない）
+    postAction({
+      action: "nav_start",
+      actor_user_id: store.user_id,
+      area_id: p.area_id,
+      included_point_ids: [p.point_id],
+      maps_url: url,
+      client_time: new Date().toISOString()
+    }).catch(() => { /* non-fatal */ });
   },
 
   async handlePointAction(action, point_id){
