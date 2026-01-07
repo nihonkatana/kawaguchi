@@ -594,17 +594,22 @@
 
       openSettings() {
         const box = document.getElementById("currentUserBox");
-        box.textContent = store.user_id ? `ログイン中：${store.display_name}（${store.role}）` : "未ログイン";
+        if (box) {
+          box.textContent = store.user_id ? `ログイン中：${store.display_name}（${store.role}）` : "未ログイン";
+        }
 
         // ★責任者マニュアル導線：allocator/planner のみ表示
         const slot = document.getElementById("allocatorManualSlot");
         if (slot) {
           const canAlloc = (store.role === "allocator" || store.role === "planner");
-          slot.innerHTML = canAlloc ? `
-      <button class="btn ghost block" onclick="window.open('manual_allocator.html','_blank')">
-        📙 責任者（割当）かんたん手順
-      </button>
-    ` : "";
+             slot.innerHTML = ""; // いったんクリア
+             if (canAlloc) {
+                 const btn = document.createElement("button");
+                 btn.className = "btn ghost block";
+                 btn.textContent = "📙 責任者（割当）かんたん手順";
+                 btn.onclick = () => window.open("manual_allocator.html", "_blank");
+                 slot.appendChild(btn);
+               }
         }
 
         document.getElementById("settingsModal").style.display = "block";
