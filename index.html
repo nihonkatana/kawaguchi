@@ -261,7 +261,9 @@
   </div>
 
   <!-- Settings Modal -->
-  <div id="settingsModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.40); z-index:1001;">
+  <div id="settingsModal" onclick="if(event.target===this) app.closeSettings()"
+    style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.40); z-index:1001;">
+
     <div style="background:var(--card); border:1px solid rgba(255,255,255,.12); color:var(--text);
                 margin:12vh auto; padding:16px; width:min(92vw,460px); border-radius:18px;">
       <div class="row space">
@@ -286,9 +288,8 @@
       <button class="btn ghost block" onclick="window.open('manual_field.html','_blank')">
         📘 現場向け かんたん使い方
       </button>
-      <button class="btn ghost block" onclick="window.open('manual_allocator.html','_blank')">
-        📙 責任者（割当）かんたん手順
-      </button>
+      <!-- ★ここにJSで責任者向けボタンを差し込む -->
+      <div id="allocatorManualSlot"></div>
     </div>
   </div>
 
@@ -296,7 +297,7 @@
     /** =========================
      *  CONFIG
      * ========================= */
-    const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbwI0SzqbR2IXwyiKOuAbywZYQ2zLDIbBi1K2bt8XU2tib2fJwjez5cKRGi4NVksyGY_pg/exec";
+    const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxzZ24bB1QYRvd6alJ7d_XpRTULkkHXGOjTriakInSHFpsAgyHEN6fpK06QiMuslPaKWw/exec";
 
     /** =========================
      *  STATE
@@ -537,6 +538,11 @@
         app.showAuth();
       },
 
+      closeSettings() {
+        const modal = document.getElementById("settingsModal");
+        if (modal) modal.style.display = "none";
+      },
+
       switchTab(which) {
         document.getElementById("tabField").classList.toggle("active", which === "field");
         document.getElementById("tabSum").classList.toggle("active", which === "sum");
@@ -589,10 +595,19 @@
       openSettings() {
         const box = document.getElementById("currentUserBox");
         box.textContent = store.user_id ? `ログイン中：${store.display_name}（${store.role}）` : "未ログイン";
+
+        // ★責任者マニュアル導線：allocator/planner のみ表示
+        const slot = document.getElementById("allocatorManualSlot");
+        if (slot) {
+          const canAlloc = (store.role === "allocator" || store.role === "planner");
+          slot.innerHTML = canAlloc ? `
+      <button class="btn ghost block" onclick="window.open('manual_allocator.html','_blank')">
+        📙 責任者（割当）かんたん手順
+      </button>
+    ` : "";
+        }
+
         document.getElementById("settingsModal").style.display = "block";
-      },
-      closeSettings() {
-        document.getElementById("settingsModal").style.display = "none";
       },
 
       openTravelModePicker() {
