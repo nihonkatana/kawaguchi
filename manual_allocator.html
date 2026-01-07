@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>責任者（Allocator）向け：簡易操作説明書</title>
+    <style>
+        :root {
+            --bg: #0b0f1a;
+            --card: #121a2b;
+            --text: #eef2ff;
+            --muted: #a7b0c0;
+            --line: rgba(255, 255, 255, .10);
+            --accent: #4f8cff;
+            --ok: #2fe27d;
+            --warn: #ffcc66;
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+            background: var(--bg);
+            color: var(--text)
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none
+        }
+
+        .wrap {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 16px 14px 36px
+        }
+
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: linear-gradient(to bottom, rgba(11, 15, 26, .98), rgba(11, 15, 26, .80));
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--line);
+            padding: 12px 14px;
+            margin: -16px -14px 14px;
+        }
+
+        .title {
+            font-size: 18px;
+            font-weight: 900
+        }
+
+        .sub {
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.6
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 14px;
+            margin: 12px 0;
+            box-shadow: 0 10px 26px rgba(0, 0, 0, .28)
+        }
+
+        .h2 {
+            margin: 0 0 10px;
+            font-size: 16px;
+            font-weight: 900
+        }
+
+        .lead {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.7
+        }
+
+        .toc {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px
+        }
+
+        .chip {
+            display: inline-block;
+            padding: 8px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .06);
+            border: 1px solid rgba(255, 255, 255, .10);
+            color: var(--text);
+            font-size: 12px;
+            font-weight: 800
+        }
+
+        .stepTitle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 10px
+        }
+
+        .badge {
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
+            background: rgba(79, 140, 255, .20);
+            border: 1px solid rgba(79, 140, 255, .45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900
+        }
+
+        .stepHead {
+            font-size: 15px;
+            font-weight: 900;
+            margin: 0
+        }
+
+        ul {
+            margin: 8px 0 0 18px;
+            padding: 0
+        }
+
+        li {
+            margin: 6px 0;
+            font-size: 13px;
+            line-height: 1.7
+        }
+
+        code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 12px;
+            background: rgba(255, 255, 255, .08);
+            padding: 2px 6px;
+            border-radius: 8px
+        }
+
+        .note {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, .05);
+            border: 1px solid rgba(255, 255, 255, .10);
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.7
+        }
+
+        .k {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 99px;
+            background: rgba(255, 255, 255, .25)
+        }
+
+        .dot.ok {
+            background: rgba(47, 226, 125, .65)
+        }
+
+        .dot.warn {
+            background: rgba(255, 204, 102, .75)
+        }
+
+        .footer {
+            color: var(--muted);
+            font-size: 12px;
+            text-align: center;
+            margin-top: 16px
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <div class="header">
+            <div class="title">責任者（Allocator）向け：簡易操作説明書</div>
+            <div class="sub">
+                目的：ホワイトリスト登録／投票区への担当者割当／進捗の確認。<br>
+                ※画面はスマホ優先。困ったら「更新」を押してください。
+            </div>
+            <div class="toc">
+                <a class="chip" href="#s1">STEP1 事前準備</a>
+                <a class="chip" href="#s2">STEP2 ユーザー登録</a>
+                <a class="chip" href="#s3">STEP3 ホワイトリスト</a>
+                <a class="chip" href="#s4">STEP4 投票区を割当</a>
+                <a class="chip" href="#s5">STEP5 進捗・集計</a>
+                <a class="chip" href="#s6">STEP6 引き継ぎ</a>
+                <a class="chip" href="#s7">よくある詰まり</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="h2">先に結論（責任者の仕事は3つ）</div>
+            <p class="lead">
+                1) <b>現場メンバーを allowlist に登録</b>（ニックネーム＋識別名の完全一致）<br>
+                2) <b>投票区を担当者に割当</b>（複数投票区をまとめて割当OK）<br>
+                3) <b>集計で進捗とメモを確認</b>（管理者は全件、現場は担当分のみ）
+            </p>
+        </div>
+
+        <div class="card" id="s1">
+            <div class="stepTitle">
+                <div class="badge">1</div>
+                <h3 class="stepHead">事前準備（最初に1回だけ）</h3>
+            </div>
+            <ul>
+                <li>あなたのアカウントが <code>allocator</code> または <code>planner</code> になっていることを確認します（画面上部の role 表示）。</li>
+                <li>担当者は「現場（field）」でOKです。責任者だけが割当・ホワイトリストを操作します。</li>
+                <li>現場に共有するURLは、基本は <b>同じURLでOK</b> です（権限で見えるものが変わります）。</li>
+            </ul>
+            <div class="note">
+                <span class="k"><span class="dot ok"></span>OK</span>：role が allocator/planner と表示される<br>
+                <span class="k"><span class="dot warn"></span>注意</span>：role が field のままだと「責任者タブ」が出ません
+            </div>
+        </div>
+
+        <div class="card" id="s2">
+            <div class="stepTitle">
+                <div class="badge">2</div>
+                <h3 class="stepHead">現場ユーザーの登録（基本フロー）</h3>
+            </div>
+            <ul>
+                <li>現場は、最初に「ニックネーム」「識別名」を入力してログインします。</li>
+                <li>ただし、<b>allowlist に事前登録が無いと登録できません</b>（NOT_ALLOWED）。</li>
+                <li>現場から「登録できない」と連絡が来たら、STEP3（ホワイトリスト）へ。</li>
+            </ul>
+            <div class="note">
+                現場への指示例：<br>
+                「ニックネーム：○○、識別名：△△（LINE表示名）」をそのまま送ってください（完全一致で登録します）
+            </div>
+        </div>
+
+        <div class="card" id="s3">
+            <div class="stepTitle">
+                <div class="badge">3</div>
+                <h3 class="stepHead">ホワイトリスト（allowlist）登録</h3>
+            </div>
+            <ul>
+                <li>責任者タブの「ホワイトリスト（allowlist）」で <b>ニックネーム＋識別名</b> を追加します。</li>
+                <li>status はシステムが <b>approved → used</b> に変えます（登録が成功すると used）。</li>
+                <li>入力のコツ：全角スペースや余計な改行は避け、<b>現場から送られた表記をコピペ</b> します。</li>
+            </ul>
+            <div class="note">
+                重要：allowlist は「本人確認の入口」です。<br>
+                いったん used になった人は、同じニックネーム＋識別名で再ログインすると同一 user として扱われます（実装方針に沿う）。
+            </div>
+        </div>
+
+        <div class="card" id="s4">
+            <div class="stepTitle">
+                <div class="badge">4</div>
+                <h3 class="stepHead">投票区を担当者に割当（まとめて割当OK）</h3>
+            </div>
+            <ul>
+                <li>責任者タブの「担当者検索（users）」で割当したい人を選択します。</li>
+                <li>下の「投票区一覧（97）」から、割当したい投票区をチェック（複数可）。</li>
+                <li><b>「選択を割当」</b> を押します。メモ欄があれば引き継ぎ内容を書けます。</li>
+                <li>競合（CONFLICT）が出たら：<b>更新 → もう一度</b>（複数人が同時操作した時に起きます）。</li>
+            </ul>
+            <div class="note">
+                ※投票区（P###）は現場には見せず、現場画面では「投票区：1」などの表示にできます（UI側で調整可）。
+            </div>
+        </div>
+
+        <div class="card" id="s5">
+            <div class="stepTitle">
+                <div class="badge">5</div>
+                <h3 class="stepHead">進捗・集計の見方（メモ含む）</h3>
+            </div>
+            <ul>
+                <li>集計タブで「投票区 + 状態（未/済）」のAND絞り込みができます。</li>
+                <li>管理者（allocator/planner）は <b>全投票区</b> を見られます。</li>
+                <li>現場（field）は <b>自分の担当投票区のみ</b> 見られます。</li>
+                <li>メモも一覧に出るので、「貼れない理由」「注意点」を責任者が把握できます。</li>
+            </ul>
+        </div>
+
+        <div class="card" id="s6">
+            <div class="stepTitle">
+                <div class="badge">6</div>
+                <h3 class="stepHead">引き継ぎ（担当変更のやり方）</h3>
+            </div>
+            <ul>
+                <li>原則：投票区単位で引き継ぎます（複数投票区をまとめて1人に割当可）。</li>
+                <li>引き継ぎ先が決まったら：対象投票区をチェック → 新しい担当者を選択 → 「選択を割当」。</li>
+                <li>引き継ぎメモ（例：午後担当、残り3件、○○は現地注意）を note に残す運用がおすすめです。</li>
+            </ul>
+            <div class="note">
+                「未」が残っている投票区だけ引き継ぐ、が一番事故が少ないです（集計で未を絞って確認）。
+            </div>
+        </div>
+
+        <div class="card" id="s7">
+            <div class="stepTitle">
+                <div class="badge">?</div>
+                <h3 class="stepHead">よくある詰まり（FAQ）</h3>
+            </div>
+            <ul>
+                <li><b>Q. 現場がログインできない</b><br>
+                    A. allowlist の表記が完全一致していない可能性。ニックネーム/識別名の余計なスペースも確認。</li>
+                <li><b>Q. 割当したのに現場側に投票区が出ない</b><br>
+                    A. 現場が「更新」を押す。改善しない場合、assignments の status が assigned になっているか確認。</li>
+                <li><b>Q. 競合（CONFLICT）が出る</b><br>
+                    A. 別の責任者が同じ投票区を更新した。更新してやり直し。</li>
+                <li><b>Q. 複数端末で同じ現場アカウントを使える？</b><br>
+                    A. 可能ですが、状態更新が混ざるので非推奨。テスト用途だけにしてください。</li>
+            </ul>
+        </div>
+
+        <div class="footer">責任者向け簡易マニュアル（manual_allocator.html）</div>
+    </div>
+</body>
+
+</html>
