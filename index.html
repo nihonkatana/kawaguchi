@@ -975,12 +975,24 @@
         </div>`;
           return;
         }
-        // 想定：resp.points（全points） + resp.state（全state）
-        store.summary = {
-          ok: true,
-          points: resp.points || [],
-          state: resp.state || {}
-        };
+
+        // 互換対応：
+        // (1) 新: resp.points + resp.state 形式
+        // (2) 旧/別実装: resp.points に status/memo が入っていて resp.state が無い形式
+        const points = resp.points || [];
+        let state = resp.state || null;
+        if (!state) {
+          state = {};
+          for (const p of points) {
+            const pid = String(p.point_id || "");
+            if (!pid) continue;
+            state[pid] = {
+              status: String(p.status || "todo"),
+              memo: String(p.memo || "")
+            };
+          }
+        }
+        store.summary = { ok: true, points, state };
 
         // area options
         const sel = document.getElementById("sumArea");
