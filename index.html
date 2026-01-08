@@ -64,7 +64,7 @@
 
       <div class="tiny" style="margin-top:12px">
         ログインできない場合：責任者に「ニックネーム」と「識別名」を伝えてホワイトリスト登録を依頼してください。<br>
-        管理者が事前に登録したホワイトリストの「ニックネーム」と「識別名」に完全一致する必要があります。
+        責任者が事前に登録したホワイトリストの「ニックネーム」と「識別名」に完全一致する必要があります。
       </div>
     </div>
 
@@ -297,7 +297,7 @@
     /** =========================
      *  CONFIG
      * ========================= */
-    const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxzZ24bB1QYRvd6alJ7d_XpRTULkkHXGOjTriakInSHFpsAgyHEN6fpK06QiMuslPaKWw/exec";
+    const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyoqEUVSpJNHCI8kHi_qoWv9nMBZ-6kfJSc568GE3gRGuwxXJFJeJJGOa-gVrMmcPg-5w/exec";
 
     /** =========================
      *  STATE
@@ -324,7 +324,10 @@
       mapArea: "",
 
       // summary cache
-      summary: { ok: false, points: [], state: {} }
+      summary: { ok: false, points: [], state: {} },
+
+      // 送信中ガード（連打防止）
+      inFlight: new Set(), // key: `${point_id}`
     };
 
     function isIOS() {
@@ -339,6 +342,7 @@
         t.classList.add("show");
         setTimeout(() => t.classList.remove("show"), 2400);
       },
+      
       setTop: () => {
         document.getElementById("userPill").textContent = store.display_name ? `ユーザー：${store.display_name}` : "ユーザー：-";
         const modeLabel = store.travel_mode === "walking" ? "徒歩" : "車";
@@ -375,6 +379,60 @@
       return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[c]));
     }
 
+    function cssEscape_(s) {
+      // CSS.escape が無い環境対策
+      s = String(s ?? "");
+      if (window.CSS && CSS.escape) return CSS.escape(s);
+      return s.replace(/["\\#.;?+*~':!^$[\]()=>|/@]/g, "\\$&");
+    }
+
+    function setBusyForPoint_(point_id, busy, clickedBtn) {
+      const pid = String(point_id || "");
+      if (!pid) return;
+
+      const sel = `[data-pid="${cssEscape_(pid)}"]`;
+      const btns = document.querySelectorAll(sel);
+
+      btns.forEach(b => {
+        if (!(b instanceof HTMLElement)) return;
+        b.disabled = !!busy;
+        b.setAttribute("aria-busy", busy ? "true" : "false");
+        b.classList.toggle("is-busy", !!busy);
+      });
+
+      // 押したボタンだけ文言を変える（任意だが体感効く）
+      if (clickedBtn && clickedBtn instanceof HTMLElement) {
+        if (busy) {
+          clickedBtn.dataset.prevText = clickedBtn.textContent || "";
+          clickedBtn.textContent = "保存中…";
+        } else {
+          const prev = clickedBtn.dataset.prevText;
+          if (prev != null) clickedBtn.textContent = prev;
+          delete clickedBtn.dataset.prevText;
+        }
+      }
+    }
+
+    function computeAreaKpi_(areaId) {
+      const pts = store.points.filter(p => p.area_id === areaId);
+      const total = pts.length;
+      const todo = pts.filter(p => (store.state[p.point_id]?.status || "todo") === "todo").length;
+      const done = pts.filter(p => (store.state[p.point_id]?.status || "todo") === "done").length;
+      return { total, todo, done };
+    }
+
+    function updatePrecinctHeader_(areaId) {
+      if (!areaId) return;
+      const { total, todo, done } = computeAreaKpi_(areaId);
+      const num = String(areaId).replace(/^P0*/, "");
+      const sub = document.getElementById("precSub");
+      const title = document.getElementById("precTitle");
+      if (title) title.textContent = `投票区：${num}`;
+      if (sub) sub.textContent =
+        `地点：${total} / 未：${todo} / 済：${done} / 移動：${store.travel_mode === "walking" ? "徒歩" : "車"}`;
+    }
+
+    
     /** =========================
      *  MAP URLS
      * ========================= */
@@ -602,14 +660,14 @@
         const slot = document.getElementById("allocatorManualSlot");
         if (slot) {
           const canAlloc = (store.role === "allocator" || store.role === "planner");
-             slot.innerHTML = ""; // いったんクリア
-             if (canAlloc) {
-                 const btn = document.createElement("button");
-                 btn.className = "btn ghost block";
-                 btn.textContent = "📙 責任者（割当）かんたん手順";
-                 btn.onclick = () => window.open("manual_allocator.html", "_blank");
-                 slot.appendChild(btn);
-               }
+          slot.innerHTML = ""; // いったんクリア
+          if (canAlloc) {
+            const btn = document.createElement("button");
+            btn.className = "btn ghost block";
+            btn.textContent = "📙 責任者（割当）かんたん手順";
+            btn.onclick = () => window.open("manual_allocator.html", "_blank");
+            slot.appendChild(btn);
+          }
         }
 
         document.getElementById("settingsModal").style.display = "block";
@@ -737,17 +795,17 @@
         ${memo ? `<div class="pointMemo">📝 ${escapeHtml_(memo)}</div>` : ``}
 
         <div class="actions">
-          <button class="btn small" data-act="nav">単点ナビ</button>
-          <button class="btn small done" data-act="done">済</button>
-          <button class="btn small todo" data-act="todo">未に戻す</button>
-          <button class="btn small memo" data-act="memo">メモ</button>
+          <button class="btn small" data-act="nav"  data-pid="${escapeHtml_(p.point_id)}">単点ナビ</button>
+          <button class="btn small done" data-act="done" data-pid="${escapeHtml_(p.point_id)}">済</button>
+          <button class="btn small todo" data-act="todo" data-pid="${escapeHtml_(p.point_id)}">未に戻す</button>
+          <button class="btn small memo" data-act="memo" data-pid="${escapeHtml_(p.point_id)}">メモ</button>
         </div>
       `;
 
-          item.querySelector('[data-act="nav"]').onclick = () => app.startSingleNav(p.point_id);
-          item.querySelector('[data-act="done"]').onclick = () => app.handlePointAction("done", p.point_id);
-          item.querySelector('[data-act="todo"]').onclick = () => app.handlePointAction("todo", p.point_id);
-          item.querySelector('[data-act="memo"]').onclick = () => app.handlePointAction("memo", p.point_id);
+          item.querySelector('[data-act="nav"]').onclick = (e) => app.startSingleNav(p.point_id);
+          item.querySelector('[data-act="done"]').onclick = (e) => app.handlePointAction("done", p.point_id, e.currentTarget);
+          item.querySelector('[data-act="todo"]').onclick = (e) => app.handlePointAction("todo", p.point_id, e.currentTarget);
+          item.querySelector('[data-act="memo"]').onclick = (e) => app.handlePointAction("memo", p.point_id, e.currentTarget);
 
           list.appendChild(item);
         }
@@ -815,49 +873,78 @@
         }).catch(() => { /* non-fatal */ });
       },
 
-      async handlePointAction(action, point_id) {
+      async handlePointAction(action, point_id, clickedBtn) {
         const p = store.points.find(x => x.point_id === point_id);
         if (!p) { ui.toast("地点が見つかりません"); return; }
 
-        let status = action;
-        let memo = store.state[point_id]?.memo || "";
+        const pid = String(point_id || "");
+        const inFlightKey = pid;
 
-        if (action === "memo") {
-          const m = prompt("メモを入力してください", memo);
-          if (m === null) return;
-          memo = m.trim();
-          status = store.state[point_id]?.status || "todo";
+        // ✅ 連打防止：送信中なら何もしない
+        if (store.inFlight.has(inFlightKey)) {
+          ui.toast("保存中です…");
+          return;
         }
 
-        const data = await postAction({
-          action: "state_update",
-          actor_user_id: store.user_id,
-          updates: [{
-            point_id,
-            status,
-            memo,
-            client_time: new Date().toISOString()
-          }]
-        });
+        // 現在値（ロールバック用）
+        const prev = {
+          status: store.state[pid]?.status || "todo",
+          memo: store.state[pid]?.memo || ""
+        };
 
-        if (!data.ok) { ui.toast("更新失敗：" + (data.error || "")); return; }
+        let nextStatus = action;
+        let nextMemo = prev.memo;
 
-        const r = (data.results || []).find(x => x.point_id === point_id);
-        if (r && !r.ok) { ui.toast("更新拒否：" + (r.error || "")); return; }
+        // メモ編集は先に入力を確定（キャンセルなら何もしない）
+        if (action === "memo") {
+          const m = prompt("メモを入力してください", prev.memo);
+          if (m === null) return;
+          nextMemo = m.trim();
+          nextStatus = prev.status; // メモだけ更新（状態は維持）
+        }
 
-        // local state
-        store.state[point_id] = { status, memo };
+        // ✅ 送信中にする（UIガード）
+        store.inFlight.add(inFlightKey);
+        setBusyForPoint_(pid, true, clickedBtn);
 
-        // ✅ 2) 根本対策：トップへ戻さない（部分更新）
-        // - 投票区画面のまま、リストと地図だけ更新
-        const area = p.area_id;
-        app.renderPointList_(area);
-        app.updateMapMarker_(point_id);
+        // ✅ 楽観UI：先に表示を変える
+        store.state[pid] = { status: nextStatus, memo: nextMemo };
+        app.renderPointList_(p.area_id);
+        app.updateMapMarker_(pid);
+        updatePrecinctHeader_(p.area_id);
+        ui.toast("保存中…");
 
-        // KPI行も更新したいのでタイトルサブを更新（スクロール保持）
-        if (store.current_area === area) app.openPrecinct(area, { keepScroll: true });
+        try {
+          const data = await postAction({
+            action: "state_update",
+            actor_user_id: store.user_id,
+            updates: [{
+              point_id: pid,
+              status: nextStatus,
+              memo: nextMemo,
+              client_time: new Date().toISOString()
+            }]
+          });
 
-        ui.toast("更新しました");
+          if (!data.ok) throw new Error(data.error || "更新失敗");
+
+          const r = (data.results || []).find(x => x.point_id === pid);
+          if (r && !r.ok) throw new Error(r.error || "更新拒否");
+
+          // ✅ 成功：そのまま確定
+          ui.toast("保存しました");
+        } catch (err) {
+          // ✅ 失敗：ロールバック
+          store.state[pid] = { status: prev.status, memo: prev.memo };
+          app.renderPointList_(p.area_id);
+          app.updateMapMarker_(pid);
+          updatePrecinctHeader_(p.area_id);
+          ui.toast("保存失敗：" + (err?.message || "不明"));
+        } finally {
+          // ✅ 解除
+          store.inFlight.delete(inFlightKey);
+          setBusyForPoint_(pid, false, clickedBtn);
+        }
       },
 
       /** -------- Leaflet map -------- */
@@ -936,10 +1023,10 @@
             const pid2 = root.querySelector("[data-pid]")?.getAttribute("data-pid");
             if (!pid2) return;
 
-            root.querySelector('[data-mk="nav"]')?.addEventListener("click", () => app.startSingleNav(pid2));
-            root.querySelector('[data-mk="done"]')?.addEventListener("click", () => app.handlePointAction("done", pid2));
-            root.querySelector('[data-mk="todo"]')?.addEventListener("click", () => app.handlePointAction("todo", pid2));
-            root.querySelector('[data-mk="memo"]')?.addEventListener("click", () => app.handlePointAction("memo", pid2));
+            root.querySelector('[data-mk="nav"]')?.addEventListener("click", (e) => app.startSingleNav(pid2));
+            root.querySelector('[data-mk="done"]')?.addEventListener("click", (e) => app.handlePointAction("done", pid2, e.currentTarget));
+            root.querySelector('[data-mk="todo"]')?.addEventListener("click", (e) => app.handlePointAction("todo", pid2, e.currentTarget));
+            root.querySelector('[data-mk="memo"]')?.addEventListener("click", (e) => app.handlePointAction("memo", pid2, e.currentTarget));
           });
 
           store.mapMarkers.push(mk);
@@ -976,23 +1063,45 @@
           return;
         }
 
-        // 互換対応：
-        // (1) 新: resp.points + resp.state 形式
-        // (2) 旧/別実装: resp.points に status/memo が入っていて resp.state が無い形式
         const points = resp.points || [];
         let state = resp.state || null;
-        if (!state) {
-          state = {};
-          for (const p of points) {
-            const pid = String(p.point_id || "");
-            if (!pid) continue;
-            state[pid] = {
-              status: String(p.status || "todo"),
-              memo: String(p.memo || "")
-            };
-          }
+
+        // memo/status のキー名ゆれを吸収するヘルパ
+        const pickMemo = (obj) => {
+          if (!obj) return "";
+          return String(
+            obj.memo ?? obj.note ?? obj.comment ?? obj.message ?? obj.m ?? ""
+          );
+        };
+        const pickStatus = (obj) => {
+          if (!obj) return "todo";
+          return String(obj.status ?? obj.st ?? "todo");
+        };
+
+        // (1) resp.state が無い/空なら points から作る
+        if (!state || typeof state !== "object") state = {};
+
+        // points 側に status/memo が入る実装にも対応して state を補完
+        for (const p of points) {
+          const pid = String(p.point_id || "");
+          if (!pid) continue;
+
+          // state優先、無ければpointsから拾う
+          if (!state[pid] || typeof state[pid] !== "object") state[pid] = {};
+          if (state[pid].status == null || state[pid].status === "") state[pid].status = pickStatus(p);
+          if (state[pid].memo == null || state[pid].memo === "") state[pid].memo = pickMemo(p);
         }
+
+        // (2) state 側の memo/status が別キー名でも拾って正規化
+        for (const pid of Object.keys(state)) {
+          const row = state[pid];
+          if (!row || typeof row !== "object") continue;
+          row.status = pickStatus(row);
+          row.memo = pickMemo(row);
+        }
+
         store.summary = { ok: true, points, state };
+
 
         // area options
         const sel = document.getElementById("sumArea");
@@ -1028,7 +1137,13 @@
           .map(p => {
             const pid = String(p.point_id || "");
             const st = String(store.summary.state?.[pid]?.status || "todo");
-            const memo = String(store.summary.state?.[pid]?.memo || "");
+            const memoRaw =
+              store.summary.state?.[pid]?.memo ??
+              store.summary.state?.[pid]?.note ??
+              p.memo ??
+              p.note ??
+              "";
+            const memo = String(memoRaw).trim();
             return { ...p, status: st, memo };
           })
           .filter(p => !area || String(p.area_id) === area)
@@ -1078,7 +1193,7 @@
         </div>
         <div class="pointName">${escapeHtml_((p.name || "").trim())}</div>
         <div class="pointAddr">${escapeHtml_((p.address || "").trim())}</div>
-        ${p.memo ? `<div class="pointMemo">📝 ${escapeHtml_(p.memo)}</div>` : ``}
+        ${p.memo && String(p.memo).trim() ? `<div class="pointMemo">📝 ${escapeHtml_(String(p.memo).trim())}</div>` : ``}
       `;
           el.appendChild(item);
         }

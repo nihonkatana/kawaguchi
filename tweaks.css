@@ -187,3 +187,55 @@ select:focus {
    color: #0b0f1a !important;
    opacity: 0.85;
 }
+
+
+/* =========================
+   TWEAKS: Leaflet ピン（目立つ色・視認性UP）
+   ========================= */
+
+/* ピン自体を少し大きく＆縁取り強め */
+.leaf-dot {
+   width: 20px;
+   height: 20px;
+   border-width: 3px;
+   box-shadow: 0 10px 22px rgba(0, 0, 0, .35);
+}
+
+/* 未：青（公園の緑に埋もれない濃さ＋少し発光） */
+.leaf-dot.todo {
+   background: #1976ff;
+   /* 濃い青 */
+   box-shadow: 0 0 0 4px rgba(25, 118, 255, .25), 0 10px 22px rgba(0, 0, 0, .35);
+}
+
+/* 済：緑（黄色寄りにして地図の緑と差をつける） */
+.leaf-dot.done {
+   background: #00d27a;
+   /* 明るい緑 */
+   box-shadow: 0 0 0 4px rgba(0, 210, 122, .22), 0 10px 22px rgba(0, 0, 0, .35);
+}
+
+/* wrap のサイズも合わせる（ズレ防止） */
+.leaf-dot-wrap {
+   width: 20px;
+   height: 20px;
+}
+
+/* =========================
+   TWEAKS: 未/済バッジを大きく
+   ========================= */
+.badge {
+   font-size: 16px;
+   padding: 8px 12px;
+   border-radius: 999px;
+   font-weight: 800;
+}
+
+/* バッジ自体のコントラストも少し上げる（任意） */
+.bTodo {
+   color: #e6f0ff;
+}
+
+.bDone {
+   color: #eafff3;
+}
