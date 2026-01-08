@@ -234,8 +234,20 @@ select:focus {
 /* バッジ自体のコントラストも少し上げる（任意） */
 .bTodo {
    color: #e6f0ff;
+   background: #1976ff;
 }
 
 .bDone {
    color: #eafff3;
+   background: #00d27a;
+}
+
+/* ===== Status badge (未/済) bigger ===== */
+.pointMeta .badge {
+   font-size: 16px !important;
+   padding: 8px 8px !important;
+   border-radius: 999px !important;
+   font-weight: 900 !important;
+   letter-spacing: .02em !important;
+   border: 2px solid rgba(255, 255, 255, .95) !important; /* 白縁 */
 }
