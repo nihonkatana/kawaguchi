@@ -251,3 +251,54 @@ select:focus {
    letter-spacing: .02em !important;
    border: 2px solid rgba(255, 255, 255, .95) !important; /* 白縁 */
 }
+
+/* Header logo (override) */
+.topbar .left {
+   display: flex;
+   align-items: center;
+   gap: 8px;
+   min-width: 0;
+}
+
+.topbar .nav-logo {
+   display: block;
+   height: 24px !important;
+   width: 24px !important;
+   /* まずは正方形で強制 */
+   max-height: 24px !important;
+   max-width: 24px !important;
+   object-fit: contain;
+}
+
+.topbar .title {
+   line-height: 1;
+}
+
+/* --- allocator/planner: pending badge 強調 --- */
+.badgePending {
+   display: inline-flex;
+   align-items: center;
+   gap: .35em;
+   font-weight: 900;
+   border: 1px solid rgba(255, 204, 102, .55);
+   background: rgba(255, 204, 102, .18);
+   color: #ffd58a;
+   padding: 6px 10px;
+   border-radius: 999px;
+}
+
+/* --- toast を画面中央に（保存/変更の表示を統一） --- */
+.toast {
+   left: 50% !important;
+   right: auto !important;
+   top: 50% !important;
+   transform: translate(-50%, -50%) !important;
+   width: min(92vw, 420px);
+   z-index: 1000;
+}
+
+.toast .card {
+   margin: 0;
+   text-align: center;
+   font-weight: 800;
+}
