@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ja">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>道 - manual_field</title>
+    <style>
+        :root {
+            --fg: #111;
+            --bg: #fff;
+            --muted: #444;
+            --max: 720px;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--fg);
+        }
+
+        /* 書道“風”に寄せる：端末にある和文フォントを優先 */
+        body {
+            font-family:
+                "Hiragino Mincho ProN",
+                "Yu Mincho",
+                "YuMincho",
+                "Noto Serif JP",
+                "MS Mincho",
+                serif;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+        }
+
+        .wrap {
+            max-width: var(--max);
+            margin: 0 auto;
+            padding: 18px 16px 28px;
+        }
+
+        .title {
+            text-align: center;
+            font-size: clamp(56px, 12vw, 88px);
+            letter-spacing: 0.06em;
+            line-height: 1;
+            margin: 10px 0 14px;
+            font-weight: 700;
+        }
+
+        .art {
+            margin: 10px auto 18px;
+            display: block;
+            width: min(520px, 92vw);
+            height: auto;
+            /* 白黒を保つ・縮小でもくっきり */
+            image-rendering: auto;
+        }
+
+        .poem {
+            text-align: center;
+            font-size: clamp(18px, 4.6vw, 26px);
+            line-height: 1.9;
+            letter-spacing: 0.02em;
+            color: var(--fg);
+            padding: 6px 0;
+        }
+
+        .poem .line {
+            margin: 6px 0;
+        }
+
+        .note {
+            text-align: center;
+            margin-top: 18px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        /* 画面が横に広いときは余白を少し増やす */
+        @media (min-width: 900px) {
+            .wrap {
+                padding-top: 26px;
+            }
+
+            .poem {
+                line-height: 2.0;
+            }
+        }
+
+        /* 印刷用（任意） */
+        @media print {
+            .wrap {
+                max-width: 100%;
+            }
+
+            .note {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="wrap">
+        <!-- <div class="title">道</div> -->
+
+        <img class="art" src="image/inoki_bw.png" alt="挿絵（白黒）">
+
+        <!-- <section class="poem" aria-label="本文">
+            <div class="line">この道を行けばどうなるものか</div>
+            <div class="line">危ぶむなかれ</div>
+            <div class="line">危ぶめば道はなし</div>
+            <div class="line">踏み出せばその一足が道となり</div>
+            <div class="line">その一足が道となる 迷わず行けよ</div>
+            <div class="line">行けば分かるさ</div>
+        </section> -->
+
+    </main>
+</body>
+
+</html>
