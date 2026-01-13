@@ -1,8 +1,11 @@
 <!doctype html>
-<html><head>
+<html lang="ja" translate="no" class="notranslate"><head>
 <meta charset="utf-8"/>
 <title>割当マップ</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Language" content="ja">
+<meta name="google" content="notranslate">
+<meta name="robots" content="notranslate">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
 html,body,#map{height:100%;margin:0;}
@@ -150,7 +153,7 @@ const LegendToggle = L.Control.extend({
     legendToggleBtn.textContent = '担当者一覧';
     div.appendChild(legendToggleBtn);
     L.DomEvent.disableClickPropagation(div);
-    L.DomEvent.on(legendToggleBtn, 'click', function(e){
+    L.DomEvent.on(legendToggleBtn, 'click pointerup', function(e){
       L.DomEvent.stop(e);
       setLegendVisible(!legendVisible);
     });
@@ -159,8 +162,11 @@ const LegendToggle = L.Control.extend({
 });
 map.addControl(new LegendToggle());
 
-// 初期状態：スマホは閉じる / PCは開く
-setLegendVisible(window.innerWidth > 768);
+// 初期状態：スマホ（タッチ端末）は閉じる / PCは開く
+const isMobileLike =
+  (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) ||
+  (window.matchMedia && window.matchMedia("(max-width: 768px)").matches);
+setLegendVisible(!isMobileLike);
 
 assignments.sort((a,b)=>a['担当者'].localeCompare(b['担当者']));
 for (const a of assignments) {
