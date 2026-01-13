@@ -66,8 +66,15 @@
     li{ margin:6px 0; color:var(--text); }
     .muted{ color:var(--muted); }
 
+    .swipe-note{
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
     .table-wrap{
-      overflow:auto;
+      overflow-x:auto;
+      overflow-y:hidden;
+      -webkit-overflow-scrolling:touch;
       border-radius:10px;
       border:1px solid var(--line);
     }
@@ -127,6 +134,7 @@
       <h3 style="margin:8px 0 6px; font-size:14px;">設定（今回の割当で使う変数）</h3>
       <section class="card">
   <h2>（設定一覧）</h2>
+  <p class="swipe-note">※表は左右にスワイプできます</p>
   <div class="table-wrap">
     <table>
       <thead><tr><th>項目</th><th>値</th><th>説明</th></tr></thead>
@@ -156,6 +164,7 @@
 
     <section class="card">
   <h2>③ 担当者ごとの一覧</h2>
+  <p class="swipe-note">※表は左右にスワイプできます</p>
   <div class="table-wrap">
     <table>
       <thead><tr><th>担当者</th><th>種別</th><th>駅</th><th>投票区一覧</th><th>掲示場件数</th><th>推定移動距離_km</th><th>推定所要時間_min</th><th>散らばり半径_km</th></tr></thead>
@@ -181,6 +190,7 @@
 
     <section class="card">
   <h2>④ 駅ごとのまとめ（自転車）</h2>
+  <p class="swipe-note">※表は左右にスワイプできます</p>
   <div class="table-wrap">
     <table>
       <thead><tr><th>駅</th><th>自転車担当数</th><th>掲示場件数合計</th><th>担当者</th><th>最大半径_km</th></tr></thead>
