@@ -117,10 +117,40 @@
     <section class="card">
       <h2>② 割当の考え方</h2>
       <ul>
-  <li>投票区（97）を、車・バイク・自転車の担当数に応じて分割しています。</li>
-  <li>各担当の所要時間は「移動（距離÷速度）＋作業（掲示場×3分）」で概算しています。</li>
-  <li>全員が 240 分以内に収まるように調整した割当案です。</li>
+  <li>掲示場（地点）を投票区ごとにまとめ、投票区単位で担当者へ割り当てます。</li>
+  <li>各担当の所要時間は「移動（距離÷速度）＋作業（掲示場×作業分）」で概算します。</li>
+  <li>全員が 240 分以内に収まることを目標に、担当範囲が偏りすぎないよう調整した割当案です。</li>
   <li>自転車の出発駅は必要に応じて置換しています（鳩ヶ谷→川口, 戸塚安行→東川口）。</li>
+  <li>このページの設定値は config.json の内容をそのまま掲載しています。</li>
+</ul>
+      <div style="height:10px"></div>
+      <h3 style="margin:8px 0 6px; font-size:14px;">設定（今回の割当で使う変数）</h3>
+      <section class="card">
+  <h2>（設定一覧）</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>項目</th><th>値</th><th>説明</th></tr></thead>
+      <tbody><tr><td>cars</td><td>5</td><td>車の担当人数（台数）</td></tr>
+<tr><td>bikes</td><td>3</td><td>バイクの担当人数（台数）</td></tr>
+<tr><td>bicycles</td><td>8</td><td>自転車の担当人数</td></tr>
+<tr><td>bicycle_stations</td><td>川口, 西川口, 川口元郷, 東川口, 新井宿, 南鳩ヶ谷, 鳩ヶ谷, 戸塚安行</td><td>自転車の出発駅（駅単位で担当エリアを作成）</td></tr>
+<tr><td>bicycle_station_override</td><td>鳩ヶ谷→川口, 戸塚安行→東川口</td><td>出発駅の置換ルール（例：鳩ヶ谷→川口）</td></tr>
+<tr><td>max_time</td><td>240</td><td>目標の上限時間（分）</td></tr>
+<tr><td>work_min</td><td>3</td><td>掲示場1件あたりの作業時間（分）</td></tr>
+<tr><td>speed_car</td><td>18</td><td>車の移動速度（km/h）</td></tr>
+<tr><td>speed_bike</td><td>16</td><td>バイクの移動速度（km/h）</td></tr>
+<tr><td>speed_bicycle</td><td>12</td><td>自転車の移動速度（km/h）</td></tr>
+<tr><td>seed</td><td>42</td><td>同じ条件で同じ割当を再現するための乱数シード</td></tr></tbody>
+    </table>
+  </div>
+</section>
+      <div style="height:10px"></div>
+      <h3 style="margin:8px 0 6px; font-size:14px;">計算の前提（固定ルール）</h3>
+      <ul>
+  <li>移動時間（分）＝（推定移動距離 km ÷ 速度 km/h）× 60</li>
+  <li>作業時間（分）＝ 掲示場件数 × 3 分</li>
+  <li>合計（分）＝ 移動時間＋作業時間（概算）</li>
+  <li>地図は投票区/担当者を「凸包（外周の囲い）」で可視化し、レイヤで表示を切り替えます。</li>
 </ul>
     </section>
 
