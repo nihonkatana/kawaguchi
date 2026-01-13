@@ -755,19 +755,19 @@
           box.textContent = store.user_id ? `ログイン中：${store.display_name}（${store.role}）` : "未ログイン";
         }
        
-        // 管理者マニュアル：今回使わない
-        // const slot = document.getElementById("allocatorManualSlot");
-        // if (slot) {
-        //   const canAlloc = (store.role === "allocator" || store.role === "planner");
-        //   slot.innerHTML = "";
-        //   if (canAlloc) {
-        //     const btn = document.createElement("button");
-        //     btn.className = "btn ghost block";
-        //     btn.textContent = "📙 責任者（割当）かんたん手順";
-        //     btn.onclick = () => window.open("manual_allocator.html", "_blank");
-        //     slot.appendChild(btn);
-        //   }
-        // }
+        //管理者マニュアル：
+        const slot = document.getElementById("allocatorManualSlot");
+        if (slot) {
+          const canAlloc = (store.role === "allocator" || store.role === "planner");
+          slot.innerHTML = "";
+          if (canAlloc) {
+            const btn = document.createElement("button");
+            btn.className = "btn ghost block";
+            btn.textContent = "📙 掲示場の割当説明と割当マップ";
+            btn.onclick = () => window.open("brief.html", "_blank");
+            slot.appendChild(btn);
+          }
+        }
 
         document.getElementById("settingsModal").style.display = "block";
       },
